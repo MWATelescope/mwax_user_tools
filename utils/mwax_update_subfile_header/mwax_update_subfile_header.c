@@ -30,6 +30,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include <ascii_header.h> // Supplied by PSRDADA
 
 #define FALSE 0
 #define TRUE !(FALSE)
@@ -47,6 +48,26 @@
 #define UINT64 unsigned long long int
 
 #define HEADER_LEN 4096
+
+#define MAX_KV_SIZE 256
+
+// A basic linked list struct
+struct key_val
+{
+    char key[MAX_KV_SIZE];
+    char val[MAX_KV_SIZE];
+    struct key_val *next;
+};
+
+void usage(FILE *f, char **argv)
+{
+    fprintf(f, "Modifies subfile headers in-place\n"
+    fprintf(f, "usage: %s [-s KEY=VAL [-s ...]] [-d KEY] SUBFILE [SUBFILE ...]\n", argv[0]);
+    fprintf(f, "\t-s KEY=VAL    Sets the value of KEY to VAL. If KEY does not exist, it is created.\n");
+    fprintf(f, "\t-d KEY        Deletes KEY from header\n");
+}
+
+int parse_cmdline(int argc, char **argv, struct key_val *kv);
 
 int main(int argc, char **argv)
 {
@@ -93,4 +114,14 @@ int main(int argc, char **argv)
     printf( "Header updated successfully\n" );
 
     exit(0);
+}
+
+/**
+ * Parse the command line
+ * @param argc Same as main()
+ * @param argv Same as main()
+ * @return A pointer to a newly constructed linked list
+ */
+struct key_val *parse_cmdline(int argc, char **argv);
+{
 }
