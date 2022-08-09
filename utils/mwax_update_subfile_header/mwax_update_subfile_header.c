@@ -98,7 +98,7 @@ void usage(FILE *f, char **argv)
     fprintf(f, "usage: %s [-h] [-s KEY=VAL [-s ...]] [-d KEY [-d ...]] SUBFILE [SUBFILE ...]\n", argv[0]);
     fprintf(f, "\t-d KEY        Deletes KEY from header.\n");
     fprintf(f, "\t-h            Prints this help and exits.\n");
-    fprintf(f, "\t-s KEY=VAL    Sets the value of KEY to VAL. If KEY does not exist, it is created.\n");
+    fprintf(f, "\t-s KEY=VAL    Sets the value of VAL to KEY. If KEY does not exist, it is created.\n");
     fprintf(f, "If no -d or -s is given, then the subfile headers are printed out to stdout\n");
 }
 
