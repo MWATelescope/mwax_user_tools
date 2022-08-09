@@ -149,7 +149,7 @@ int main(int argc, char **argv)
             continue;
         }
 
-        // If we got to here, then there are at least come modifications to be made
+        // If we got to here, then there are at least some modifications to be made
         while (kv != NULL)
         {
             switch (kv->instruction)
