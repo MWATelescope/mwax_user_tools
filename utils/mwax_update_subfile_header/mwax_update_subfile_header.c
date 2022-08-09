@@ -52,76 +52,170 @@
 #define MAX_KV_SIZE 256
 
 // A basic linked list struct
-struct key_val
+#define MODIFY_KV 0 /* Either modify or create keyword */
+#define DELETE_KV 1 /* Delete keyword */
+struct keyval
 {
     char key[MAX_KV_SIZE];
     char val[MAX_KV_SIZE];
-    struct key_val *next;
+    int instruction; // MODIFY_KV, DELETE_KV
+    struct keyval *next;
 };
+
+int append_keyval(struct keyval *kv, const char *key, const char *val, int instruction)
+{
+    if (kv == NULL) // If kv is an empty list...
+    {
+        kv = (struct keyval *)malloc(sizeof(struct keyval));
+    }
+    else
+    {
+        // Move to the end of the list
+        while (kv->next != NULL)
+            kv = kv->next;
+
+        // Create a new node and move to it
+        kv->next = (struct keyval *)malloc(sizeof(struct keyval));
+        kv = kv->next;
+    }
+
+    // Update the values
+    if (key != NULL)
+        snprintf(kv->key, MAX_KV_SIZE, "%s", key);
+
+    if (val != NULL)
+        snprintf(kv->val, MAX_KV_SIZE, "%s", val);
+
+    kv->instruction = instruction;
+}
 
 void usage(FILE *f, char **argv)
 {
-    fprintf(f, "Modifies subfile headers in-place\n"
-    fprintf(f, "usage: %s [-s KEY=VAL [-s ...]] [-d KEY] SUBFILE [SUBFILE ...]\n", argv[0]);
+    fprintf(f, "usage: %s [-h] [-s KEY=VAL [-s ...]] [-d KEY [-d ...]] SUBFILE [SUBFILE ...]\n", argv[0]);
+    fprintf(f, "\t-d KEY        Deletes KEY from header.\n");
+    fprintf(f, "\t-h            Prints this help and exits.\n");
     fprintf(f, "\t-s KEY=VAL    Sets the value of KEY to VAL. If KEY does not exist, it is created.\n");
-    fprintf(f, "\t-d KEY        Deletes KEY from header\n");
+    fprintf(f, "If no -d or -s is given, then the subfile headers are printed out to stdout\n");
 }
 
-int parse_cmdline(int argc, char **argv, struct key_val *kv);
+struct keyval *parse_cmdline(int argc, char **argv, int *first_filename_idx);
 
 int main(int argc, char **argv)
 {
-//    char filename[300];
+    // Parse the command line
+    int first_filename_idx;
+    struct keyval *kv = parse_cmdline(argc, argv, &first_filename_idx);
 
-    int file_descr;
+    // Loop over the remaining arguments, open the files, and view/modify their headers
+    int i;
+    for (i = first_filename_idx; i < argc; i++)
+    {
+        int file_descr;
 
-    int input_read;
-    int input_write;
+        int input_read;
+        int input_write;
 
-    char header_buffer[HEADER_LEN]={0x00};
+        char header_buffer[HEADER_LEN];
 
-    file_descr = open( argv[1], O_RDONLY );
-    if (file_descr < 0) {
-        printf( "Error opening header file:%s\n", argv[1] );
-        exit(0);
+        file_descr = open( argv[i], O_RDONLY );
+        if (file_descr < 0)
+        {
+            printf( "ERROR: Error opening header file: %s\n", argv[i] );
+            exit(EXIT_FAILURE);
+        }
+
+        input_read = read(file_descr, header_buffer, HEADER_LEN);
+        if (input_read < HEADER_LEN)
+        {
+            fprintf(stderr, "ERROR: insufficient header read from file:%s.  Read returned %d.\n", argv[i], input_read );
+            exit(EXIT_FAILURE);
+        }
+
+        // If there are no -d's or -s's, then kv will be NULL.
+        // In this case, just read in the headers and print them to stdout
+        if (kv == NULL)
+        {
+            printf("%s:\n%s\n", argv[i], header_buffer);
+            close ( file_descr );
+            continue;
+        }
+
+        close ( file_descr );
+
+        file_descr = open( argv[2], O_WRONLY );
+        if (file_descr < 0) {
+            printf( "Error opening destination file:%s\n", argv[2] );
+            exit(0);
+        }
+
+        input_write = write ( file_descr, header_buffer, HEADER_LEN );
+        if (input_write != HEADER_LEN) {
+            printf( "Write to %s failed.  Returned a value of %d.\n", argv[2], input_write );
+            exit(0);
+        }
+
+        close ( file_descr );
+
+        printf( "Header updated successfully\n" );
+
+        exit(EXIT_SUCCESS);
     }
-
-
-    input_read = read ( file_descr, header_buffer, HEADER_LEN );
-    if (input_read < 20) {
-        printf( "insufficient header read from file:%s.  Read returned %d.\n", argv[1], input_read );
-        exit(0);
-    }
-
-    printf( "Read a %d length header from file:%s\n", input_read, argv[1] );
-
-    close ( file_descr );
-
-    file_descr = open( argv[2], O_WRONLY );
-    if (file_descr < 0) {
-        printf( "Error opening destination file:%s\n", argv[2] );
-        exit(0);
-    }
-
-    input_write = write ( file_descr, header_buffer, HEADER_LEN );
-    if (input_write != HEADER_LEN) {
-        printf( "Write to %s failed.  Returned a value of %d.\n", argv[2], input_write );
-        exit(0);
-    }
-
-    close ( file_descr );
-
-    printf( "Header updated successfully\n" );
-
-    exit(0);
 }
 
 /**
  * Parse the command line
- * @param argc Same as main()
- * @param argv Same as main()
+ * @param[in] argc Same as main()
+ * @param[in] argv Same as main()
+ * @param[out] first_filename_idx The index into argv of the first filename
  * @return A pointer to a newly constructed linked list
  */
-struct key_val *parse_cmdline(int argc, char **argv);
+struct keyval *parse_cmdline(int argc, char **argv, int *first_filename_idx)
 {
+    struct keyval *kv = NULL;
+    char key[MAX_KV_SIZE];
+    char val[MAX_KV_SIZE];
+    int n; // Used for counting scanf'd items
+
+    int opt;
+    while ((opt = getopt(argc, argv, "d:hs:")) != -1)
+    {
+        switch (opt)
+        {
+            case 'd':
+                append_keyval(kv, key, NULL, DELETE_KV);
+                break;
+            case 'h':
+                printf("Modifies subfile headers in-place\n");
+                usage(stdout, argv);
+                exit(EXIT_SUCCESS);
+                break;
+            case 's':
+                n = sscanf(optarg, "%[^=]=%s", key, val);
+                if (n != 2)
+                {
+                    printf("n=%d\n", n);
+                    fprintf(stderr, "ERROR: cannot parse \"%s\" as KEY=VAL\n", optarg);
+                    usage(stderr, argv);
+                    exit(EXIT_FAILURE);
+                }
+                append_keyval(kv, key, val, MODIFY_KV);
+                break;
+            default:
+                fprintf(stderr, "ERROR: Unrecognised option '-%c'\n", opt);
+                usage(stderr, argv);
+                exit(EXIT_FAILURE);
+        }
+    }
+
+    // Check that there is at least one non-option argument given
+    if (optind == argc)
+    {
+        fprintf(stderr, "ERROR: No subfiles given\n");
+        usage(stderr, argv);
+        exit(EXIT_FAILURE);
+    }
+
+    *first_filename_idx = optind;
+
+    return kv;
 }
