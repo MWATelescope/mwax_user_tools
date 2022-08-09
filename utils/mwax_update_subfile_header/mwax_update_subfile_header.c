@@ -62,31 +62,39 @@ struct keyval
     struct keyval *next;
 };
 
-int append_keyval(struct keyval *kv, const char *key, const char *val, int instruction)
+int append_keyval(struct keyval **kv, const char *key, const char *val, int instruction)
 {
-    if (kv == NULL) // If kv is an empty list...
+    struct keyval *new_kv;
+
+    if (*kv == NULL) // If kv is an empty list...
     {
-        kv = (struct keyval *)malloc(sizeof(struct keyval));
+        *kv = (struct keyval *)malloc(sizeof(struct keyval));
+        new_kv = *kv;
     }
     else
     {
+        new_kv = *kv;
+
         // Move to the end of the list
-        while (kv->next != NULL)
-            kv = kv->next;
+        while (new_kv->next != NULL)
+            new_kv = new_kv->next;
 
         // Create a new node and move to it
-        kv->next = (struct keyval *)malloc(sizeof(struct keyval));
-        kv = kv->next;
+        new_kv->next = (struct keyval *)malloc(sizeof(struct keyval));
+        new_kv = new_kv->next;
     }
 
     // Update the values
     if (key != NULL)
-        snprintf(kv->key, MAX_KV_SIZE, "%s", key);
+        snprintf(new_kv->key, MAX_KV_SIZE, "%s", key);
 
     if (val != NULL)
-        snprintf(kv->val, MAX_KV_SIZE, "%s", val);
+        snprintf(new_kv->val, MAX_KV_SIZE, "%s", val);
 
-    kv->instruction = instruction;
+    new_kv->instruction = instruction;
+    new_kv->next = NULL;
+
+    return EXIT_SUCCESS;
 }
 
 void usage(FILE *f, char **argv)
@@ -104,20 +112,24 @@ int main(int argc, char **argv)
 {
     // Parse the command line
     int first_filename_idx;
-    struct keyval *kv = parse_cmdline(argc, argv, &first_filename_idx);
+    struct keyval *first_kv = parse_cmdline(argc, argv, &first_filename_idx);
+    struct keyval *kv;
+
+    // Set up variables for handling I/O
+    int file_descr;
+
+    int input_read;
+    int input_write;
+
+    char header_buffer[HEADER_LEN];
 
     // Loop over the remaining arguments, open the files, and view/modify their headers
     int i;
     for (i = first_filename_idx; i < argc; i++)
     {
-        int file_descr;
+        printf("Opening %s...\n", argv[i]);
 
-        int input_read;
-        int input_write;
-
-        char header_buffer[HEADER_LEN];
-
-        file_descr = open( argv[i], O_RDONLY );
+        file_descr = open( argv[i], O_RDWR );
         if (file_descr < 0)
         {
             printf( "ERROR: Error opening header file: %s\n", argv[i] );
@@ -133,6 +145,7 @@ int main(int argc, char **argv)
 
         // If there are no -d's or -s's, then kv will be NULL.
         // In this case, just read in the headers and print them to stdout
+        kv = first_kv;
         if (kv == NULL)
         {
             printf("%s:\n%s\n", argv[i], header_buffer);
@@ -140,26 +153,44 @@ int main(int argc, char **argv)
             continue;
         }
 
-        close ( file_descr );
+        // If we got to here, then there are at least come modifications to be made
+        while (kv != NULL)
+        {
+            switch (kv->instruction)
+            {
+                case MODIFY_KV:
+                    if (ascii_header_set(header_buffer, kv->key, "%s", kv->val) == -1)
+                    {
+                        fprintf(stderr, "WARNING: Could not modify/create %s=%s\n", kv->key, kv->val);
+                    }
+                    break;
+                case DELETE_KV:
+                    if (ascii_header_del(header_buffer, kv->key) == -1)
+                    {
+                        fprintf(stderr, "WARNING: Could not delete keyword %s\n", kv->key);
+                    }
+                    break;
+                default:
+                    fprintf(stderr, "WARNING: Unrecognised instruction code (%d)\n", kv->instruction);
+            }
 
-        file_descr = open( argv[2], O_WRONLY );
-        if (file_descr < 0) {
-            printf( "Error opening destination file:%s\n", argv[2] );
-            exit(0);
+            kv = kv->next;
         }
 
-        input_write = write ( file_descr, header_buffer, HEADER_LEN );
-        if (input_write != HEADER_LEN) {
-            printf( "Write to %s failed.  Returned a value of %d.\n", argv[2], input_write );
-            exit(0);
+        // Now that the header buffer has been suitably altered, write it back to the beginning of the file
+        lseek(file_descr, 0, SEEK_SET);
+        input_write = write(file_descr, header_buffer, HEADER_LEN);
+        if (input_write != HEADER_LEN)
+        {
+            printf("FATAL WARNING: Write to %s failed.  Returned a value of %d. "
+                    "The header may now be corrupted.\n", argv[i], input_write);
+            exit(EXIT_FAILURE);
         }
 
-        close ( file_descr );
-
-        printf( "Header updated successfully\n" );
-
-        exit(EXIT_SUCCESS);
+        close(file_descr);
     }
+
+    exit(EXIT_SUCCESS);
 }
 
 /**
@@ -182,7 +213,7 @@ struct keyval *parse_cmdline(int argc, char **argv, int *first_filename_idx)
         switch (opt)
         {
             case 'd':
-                append_keyval(kv, key, NULL, DELETE_KV);
+                append_keyval(&kv, optarg, NULL, DELETE_KV);
                 break;
             case 'h':
                 printf("Modifies subfile headers in-place\n");
@@ -198,7 +229,7 @@ struct keyval *parse_cmdline(int argc, char **argv, int *first_filename_idx)
                     usage(stderr, argv);
                     exit(EXIT_FAILURE);
                 }
-                append_keyval(kv, key, val, MODIFY_KV);
+                append_keyval(&kv, key, val, MODIFY_KV);
                 break;
             default:
                 fprintf(stderr, "ERROR: Unrecognised option '-%c'\n", opt);
