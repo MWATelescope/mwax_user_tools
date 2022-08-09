@@ -1,20 +1,16 @@
 // 
-// *Very* basic utility to replace an existing subfile header with a header based on a supplied text file.
+// Basic utility to replace an existing subfile header with a header based on a supplied text file.
 //
 // To compile: 
-//   gcc -Wall -Ofast mwax_update_subfile_header.c -oupdate_mwax_subfile_header -lrt
+//   gcc -Wall -Ofast mwax_update_subfile_header.c -o mwax_update_subfile_header -lpsrdada
 //
 // Usage:
-//   mwax_update_subfile_header HEADERFILE SUBFILE
+//   mwax_update_subfile_header [-h] [-s KEY=VAL [-s ...]] [-d KEY [-d ...]] SUBFILE [SUBFILE ...]
 //
-// Where:
-//   HEADERFILE is an ASCII text file containing the PSRDADA header you want for the SUBFILE.
+//   Run `mwax_update_subfile_header -h` for more detailed usage information.
 //
 // See the following link for a description of an MWAX Subfile PSRDADA header: https://wiki.mwatelescope.org/display/MP/MWAX+PSRDADA+header
 // 
-// TODO: make more user friendly with standard command line arg parsing and --help for usage info
-// TODO: better error handling
-// TODO: provide a method (or another tool) which will just take a subfile and correlator params and just update those. This will be useful for folks using the MWAX Offline correlator especially!
 //
 
 #include <stdio.h>
