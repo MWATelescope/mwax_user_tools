@@ -50,15 +50,18 @@
 // A basic linked list struct
 #define MODIFY_KV 0 /* Either modify or create keyword */
 #define DELETE_KV 1 /* Delete keyword */
+#define INCRMT_KV 2 /* Increment value (uses inc_val instead of val) */
 struct keyval
 {
-    char key[MAX_KV_SIZE];
-    char val[MAX_KV_SIZE];
-    int instruction; // MODIFY_KV, DELETE_KV
+    char   key[MAX_KV_SIZE];
+    char   val[MAX_KV_SIZE];
+    int    inc_val;
+    int    inc_amount;
+    int    instruction; // MODIFY_KV, DELETE_KV, INCRMT_KV
     struct keyval *next;
 };
 
-int append_keyval(struct keyval **kv, const char *key, const char *val, int instruction)
+int append_keyval(struct keyval **kv, const char *key, const char *val, int instruction, int inc_amount)
 {
     struct keyval *new_kv;
 
@@ -88,6 +91,11 @@ int append_keyval(struct keyval **kv, const char *key, const char *val, int inst
         snprintf(new_kv->val, MAX_KV_SIZE, "%s", val);
 
     new_kv->instruction = instruction;
+    new_kv->inc_amount = inc_amount;
+
+    if (instruction == INCRMT_KV)
+        new_kv->inc_val = (val == NULL ? 0 : atoi(val));
+
     new_kv->next = NULL;
 
     return EXIT_SUCCESS;
@@ -95,11 +103,16 @@ int append_keyval(struct keyval **kv, const char *key, const char *val, int inst
 
 void usage(FILE *f, char **argv)
 {
-    fprintf(f, "usage: %s [-h] [-s KEY=VAL [-s ...]] [-d KEY [-d ...]] SUBFILE [SUBFILE ...]\n", argv[0]);
-    fprintf(f, "\t-d KEY        Deletes KEY from header.\n");
-    fprintf(f, "\t-h            Prints this help and exits.\n");
-    fprintf(f, "\t-s KEY=VAL    Sets the value of VAL to KEY. If KEY does not exist, it is created.\n");
-    fprintf(f, "If no -d or -s is given, then the subfile headers are printed out to stdout\n");
+    fprintf(f, "usage: %s [-h] [-s KEY=VAL [-s ...]] [-d KEY [-d ...]] [-o KEY[=VAL[:INC]]] SUBFILE [SUBFILE ...]\n", argv[0]);
+    fprintf(f, "\t-d KEY          Deletes KEY from header.\n");
+    fprintf(f, "\t-h              Prints this help and exits.\n");
+    fprintf(f, "\t-o KEY[=VAL[:INC]]\n");
+    fprintf(f, "\t                Sets KEY=VAL for the first SUBFILE, and increments VAL += INC for\n");
+    fprintf(f, "\t                each succesive SUBFILE. If VAL and INC cannot be converted to an int,\n");
+    fprintf(f, "\t                or if they are not supplied, they are set to 0 and 1, respectively. INC can be\n");
+    fprintf(f, "\t                any integer (including zero and negative). If KEY does not exist, it is created.\n");
+    fprintf(f, "\t-s KEY=VAL      Sets the value of VAL to KEY. If KEY does not exist, it is created.\n");
+    fprintf(f, "If no -d or -s is given, then the subfile headers are printed out to stdout.\n");
 }
 
 struct keyval *parse_cmdline(int argc, char **argv, int *first_filename_idx);
@@ -166,6 +179,13 @@ int main(int argc, char **argv)
                         fprintf(stderr, "WARNING: Could not delete keyword %s\n", kv->key);
                     }
                     break;
+                case INCRMT_KV:
+                    if (ascii_header_set(header_buffer, kv->key, "%d", kv->inc_val) == -1)
+                    {
+                        fprintf(stderr, "WARNING: Could not increment %s=%d\n", kv->key, kv->inc_val);
+                    }
+                    kv->inc_val += kv->inc_amount;
+                    break;
                 default:
                     fprintf(stderr, "WARNING: Unrecognised instruction code (%d)\n", kv->instruction);
             }
@@ -201,31 +221,54 @@ struct keyval *parse_cmdline(int argc, char **argv, int *first_filename_idx)
     struct keyval *kv = NULL;
     char key[MAX_KV_SIZE];
     char val[MAX_KV_SIZE];
+    int inc_amount;
     int n; // Used for counting scanf'd items
 
     int opt;
-    while ((opt = getopt(argc, argv, "d:hs:")) != -1)
+    while ((opt = getopt(argc, argv, "d:ho:s:")) != -1)
     {
         switch (opt)
         {
             case 'd':
-                append_keyval(&kv, optarg, NULL, DELETE_KV);
+                append_keyval(&kv, optarg, NULL, DELETE_KV, 0);
                 break;
             case 'h':
                 printf("Modifies subfile headers in-place\n");
                 usage(stdout, argv);
                 exit(EXIT_SUCCESS);
                 break;
+            case 'o':
+                n = sscanf(optarg, "%[^=]=%[^:]:%d", key, val, &inc_amount);
+                if (n == 0)
+                {
+                    fprintf(stderr, "ERROR: cannot parse \"%s\" as KEY[=VAL[:INC]]\n", optarg);
+                    usage(stderr, argv);
+                    exit(EXIT_FAILURE);
+                }
+
+                if (n == 1)
+                    append_keyval(&kv, key, "0", INCRMT_KV, 1);
+                else if (n == 2)
+                    append_keyval(&kv, key, val, INCRMT_KV, 1);
+                else if (n == 3)
+                    append_keyval(&kv, key, val, INCRMT_KV, inc_amount);
+                else
+                {
+                    fprintf(stderr, "ERROR: unexpected number (%d) of parsed elements in \"%s\"\n", n, optarg);
+                    usage(stderr, argv);
+                    exit(EXIT_FAILURE);
+                }
+
+                break;
             case 's':
                 n = sscanf(optarg, "%[^=]=%s", key, val);
                 if (n != 2)
                 {
-                    printf("n=%d\n", n);
                     fprintf(stderr, "ERROR: cannot parse \"%s\" as KEY=VAL\n", optarg);
                     usage(stderr, argv);
                     exit(EXIT_FAILURE);
                 }
-                append_keyval(&kv, key, val, MODIFY_KV);
+                append_keyval(&kv, key, val, MODIFY_KV, 0);
                 break;
             default:
                 fprintf(stderr, "ERROR: Unrecognised option '-%c'\n", opt);
