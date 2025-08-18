@@ -37,7 +37,6 @@ for ((i=0; i<${NUM_SOURCES}; i++)); do
 done
 
 # build the test subfile, reading in filenames and delays from file, and the PSRDADA header
-#./make_test_subfile -H 0 -d 12800 -b 8 -f filenames.txt -D delays.txt -o test_subfile.sub
 echo
 echo "Calling make_test_subfile to assemble a test subfile for $NUM_TILES tiles..."
 echo
