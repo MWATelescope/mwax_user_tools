@@ -251,7 +251,7 @@ int main(int argc, char *argv[])
   int num_subblocks = NUM_SUBBLOCKS;
   // 64000 samples per sub-block, 50 ms at 1.28 Msample/s, 10 FFTs of 6400 samples each
   int subblock_row_size = NUM_FFTS_PER_BLOCK * fft_size * (bits_per_sample / 8);  // size in bytes
-  int subblock_total_size = subblock_row_size * num_sources;
+  long int subblock_total_size = subblock_row_size * num_sources;
   size_t total_size = num_subblocks * subblock_total_size;
 
   fprintf(stdout, "INFO: size of data portion of subfile = %zu bytes, size including header = %zu\n", total_size, total_size + PSRDADA_HEADER_SIZE);
