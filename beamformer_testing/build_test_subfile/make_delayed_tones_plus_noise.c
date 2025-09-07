@@ -247,7 +247,11 @@ int main(int argc, char *argv[])
   fprintf(stdout, "INFO: applying a delay of %f samples to the signal\n", delay_fraction);
   for (int i=0; i<num_tones; i++)
   {
-    double phase_shift_for_this_bin = phase_shift_per_chan * tone_bin[i];
+    double phase_shift_for_this_bin;
+    if (tone_bin[i] <= (fft_size/2))
+      phase_shift_for_this_bin = phase_shift_per_chan * (double)tone_bin[i];
+    else
+      phase_shift_for_this_bin = phase_shift_per_chan * (double)(tone_bin[i] - fft_size);
     data_frame_complex_double[tone_bin[i]][0] = tone_amplitude[i] * cos(phase_shift_for_this_bin);
     data_frame_complex_double[tone_bin[i]][1] = tone_amplitude[i] * sin(phase_shift_for_this_bin);
     fprintf(stdout, "INFO: tone bin %d phase shifted by %f radians = %f degrees\n", tone_bin[i], phase_shift_for_this_bin, (phase_shift_for_this_bin * (180.0/M_PI)));
