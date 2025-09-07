@@ -243,7 +243,8 @@ int main(int argc, char *argv[])
   }
 
   // insert the specified tones at their specified amplitudes and phases
-  double phase_shift_per_chan = 2.0 * M_PI * delay_fraction / (double)fft_size;
+  // (negative phase shifts correspond to positive delays, i.e. shifting to later in time)
+  double phase_shift_per_chan = -2.0 * M_PI * delay_fraction / (double)fft_size;
   fprintf(stdout, "INFO: applying a delay of %f samples to the signal\n", delay_fraction);
   for (int i=0; i<num_tones; i++)
   {
