@@ -16,6 +16,7 @@
 // system include files
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <getopt.h>
 
@@ -69,6 +70,20 @@ int main(int argc, char *argv[])
   char sources_fname[100] = DEFAULT_SOURCES_FILENAME;
   char delays_fname[100] = DEFAULT_DELAYS_FILENAME;
   char out_fname[100] = DEFAULT_OUTPUT_FILENAME;
+
+struct block_0_path_metadata_sans_delays
+{
+  uint16_t rf_input;
+  int16_t ws_delay_applied;    // the whole-sample delay for this signal path, for the entire sub-observation - will often be negative
+  double start_total_delay;    // the start, middle and delays, from which intermediate delays can be calculated by polynomial interpolation
+  double middle_total_delay;
+  double end_total_delay;
+  double initial_delay;        // initial residual delay at centre of first 5 ms timestep
+  double delta_delay;          // increment between timesteps
+  double delta_delta_delay;    // increment in the increment between timesteps
+  int16_t num_pointings;       // may be multiple pointings with beamforming, the first pointing is the correlation pointing centre
+  int16_t reserved;
+ };
 
   int tiles = DEFAULT_MWA_TILES;
   int fft_size = FFT_SIZE;
@@ -286,9 +301,12 @@ int main(int argc, char *argv[])
   memset(subfile_buffer, 0, subblock_total_size);
 
   // write the delay values from the delays file into block0
-
-  float *delays_start = (float *)(subfile_buffer + 56);    // delay values start at byte 56 in the first sub-block
-  int delay_row_stride = DELAY_ROW_BYTES / sizeof(float);  // number of floats in a delay row
+  #define SME_OFFSET 4           // where the start/middle/end delays start in each delay row
+  #define DELAY_TABLE_OFFSET 56  // where the delay table values start in each delay row
+  int delay_row_float_stride = DELAY_ROW_BYTES / sizeof(float);    // number of floats in a delay row
+  int delay_row_double_stride = DELAY_ROW_BYTES / sizeof(double);  // number of doubles in a delay row
+  double *sme_start = (double *)(subfile_buffer + SME_OFFSET);
+  float *delays_start = (float *)(subfile_buffer + DELAY_TABLE_OFFSET);
   for (int i = 0; i < num_sources; i++)
   {
     float delay;
@@ -297,11 +315,16 @@ int main(int argc, char *argv[])
       fprintf(stderr, "ERROR: failed to read delay value for source %d\n", i);
       exit(EXIT_FAILURE);
     }
-    // print delay value
+    // print the delay value
     fprintf(stdout, "INFO: delay for source %d = %f samples\n", i, delay);
+    // set start/middle/end delays to the same value
+    sme_start[i * delay_row_double_stride] = (double)delay;
+    sme_start[i * delay_row_double_stride + 1] = (double)delay;
+    sme_start[i * delay_row_double_stride + 2] = (double)delay;
+    // populate the delay table with this value for all 1600 entries
     for (int k = 0; k < NUM_DELAYS; k++)
     {
-      delays_start[i * delay_row_stride + k] = delay;
+      delays_start[i * delay_row_float_stride + k] = delay;
     }
   }
 
