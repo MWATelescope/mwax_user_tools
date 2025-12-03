@@ -21,12 +21,12 @@
 #define TOTAL_SAMPLES 10240000               // total number of complex samples in each pol in an 1.28 MHz 8 second MWA subfile
 #define FFT_SIZE 200                         // FFT length for channelisation
 #define SAMPLE_RATE 1280000.0f               // sample rate in Hz for 1.28 MHz bandwidth
-#define NUM_PHASE_BINS 256                   // number of phase bins for folding the data
 
 #define DEFAULT_HEADER_SIZE 32               // default is VDIF
 #define DEFAULT_DATA_FRAME_SIZE 8192         // 8192 bytes
 #define DEFAULT_NUM_INPUT_BITS 8             // twice this for a complex sample
 #define DEFAULT_CENTRE_FREQUENCY_MHZ 150.0f  // centre frequency in MHz
+#define DEFAULT_NUM_PHASE_BINS 128           // number of phase bins for folding the data
 #define DEFAULT_OUTPUT_FILENAME "pulse_profile.dat"
 
 void usage()
@@ -37,6 +37,7 @@ void usage()
     "         -d <int>          data frame size in bytes [default %d]\n"
     "         -b <int>          bits per sample (real and imag) [default %d]\n"
     "         -u                if this option is present, data is assumed to be unsigned (default is signed)\n"
+    "         -B <int>          number of phase bins for folding the data [default %d]\n"
     "         -P <period>       period at which to fold the data (diagnostic) [default no folding]\n"
     "         -D <num>          DM for incoherent de-dispersion [default no de-dispersion]\n"
     "         -O <offset>       non-negative phase offset time in seconds (to place the pulse at a desired phase) [default 0.0 s]\n"
@@ -47,7 +48,7 @@ void usage()
     "         -i                input filename\n"
     "         -o                output filename [default %s]\n"
     "         -h                print this usage information\n\n",
-    DEFAULT_HEADER_SIZE, DEFAULT_DATA_FRAME_SIZE, DEFAULT_NUM_INPUT_BITS, DEFAULT_CENTRE_FREQUENCY_MHZ, DEFAULT_OUTPUT_FILENAME);
+    DEFAULT_HEADER_SIZE, DEFAULT_DATA_FRAME_SIZE, DEFAULT_NUM_INPUT_BITS, DEFAULT_NUM_PHASE_BINS, DEFAULT_CENTRE_FREQUENCY_MHZ, DEFAULT_OUTPUT_FILENAME);
 }
 
 
@@ -62,6 +63,7 @@ int main(int argc, char *argv[])
     {"d",           required_argument, 0, 'd'},
     {"b",           required_argument, 0, 'b'},
     {"u",           no_argument,       0, 'u'},
+    {"B",           required_argument, 0, 'B'},
     {"P",           required_argument, 0, 'P'},
     {"D",           required_argument, 0, 'D'},
     {"O",           required_argument, 0, 'O'},
@@ -87,6 +89,7 @@ int main(int argc, char *argv[])
   int frame_dsize = DEFAULT_DATA_FRAME_SIZE;
   int bits_per_sample = DEFAULT_NUM_INPUT_BITS;  // 2x this for full complex sample
   int format = 0;              // 0 = signed (default), 1 = unsigned
+  int num_phase_bins = DEFAULT_NUM_PHASE_BINS;
   float folding_period = 1.0;  // default folding period to prevent divide by zero
   float folding_dm = 0.0;
   float phase_offset_time = 0.0f;  // in seconds
@@ -95,7 +98,7 @@ int main(int argc, char *argv[])
   // parse command line options
   while (1)
   {
-    opt = getopt_long_only(argc, argv, "H:d:b:uP:D:O:f:ln:Ni:o:h", options, NULL);
+    opt = getopt_long_only(argc, argv, "H:d:b:uB:P:D:O:f:ln:Ni:o:h", options, NULL);
     
     if (opt == EOF) break;
     
@@ -125,6 +128,15 @@ int main(int argc, char *argv[])
 
       case 'u':
         format = 1;  // unsigned
+        break;
+
+      case 'B':
+        num_phase_bins = atoi(optarg);
+        if (num_phase_bins < 1)
+        {
+          fprintf(stderr, "ERROR: bad -B option %s\n", optarg);
+          exit(EXIT_FAILURE);
+        }
         break;
 
       case 'P':
@@ -276,7 +288,6 @@ int main(int argc, char *argv[])
       }
     }
 
-
     if (bytes_read != frame_dsize)
     {
       fprintf(stdout, "INFO: cannot read %d bytes from input file, assuming reached EOF\n", frame_dsize);
@@ -310,7 +321,6 @@ int main(int argc, char *argv[])
   }
 #endif
 
-#if 1
   // FFT channelise each pol
   for (int ifft = 0; ifft < samples_per_channel; ifft++)
   {
@@ -322,7 +332,6 @@ int main(int argc, char *argv[])
     fftw_execute_dft(plan_pol1, in_ifft, out_ifft);
   }
   fprintf(stdout, "INFO: %d FFTs completed for each pol\n", samples_per_channel);
-#endif
 
 #if 1
   // print the first samples of the the channelised input file
@@ -349,7 +358,7 @@ int main(int argc, char *argv[])
 #if 1
   // print the first powers
   fprintf(stdout, "First powers:\n");
-  for (int i=0; i<200; i++)
+  for (int i=0; i<FFT_SIZE; i++)   // one whole FFT size worth
   {
     fprintf(stdout, "    power both pols[%d] = %f\n", i, power_both_pols[i]);
   }
@@ -358,8 +367,6 @@ int main(int argc, char *argv[])
   // at this point we have Stokes I power samples in power_both_pols[] array, channelised
 
   fprintf(stdout, "Folding each fine channel\n");
-
-  int num_phase_bins = NUM_PHASE_BINS;
   float *phase_bins = (float *)calloc(num_phase_bins, sizeof(float));          // bin values all initialised to zero
   int *num_values_per_bin = (int *)calloc(num_phase_bins, sizeof(int));        // bin counts all initialised to zero
   float *channel_dm_time_offsets = (float *)malloc(fft_size * sizeof(float));  // in seconds
