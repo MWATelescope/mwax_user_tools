@@ -18,15 +18,15 @@
 #include <complex.h>
 #include <fftw3.h>
 
-#define TOTAL_SAMPLES 10240000            // total number of complex samples in each pol in an 1.28 MHz 8 second MWA subfile
-#define FFT_SIZE 200                      // FFT length for channelisation
-#define SAMPLE_RATE 1280000.0f            // sample rate in Hz for 1.28 MHz bandwidth
-#define NUM_PHASE_BINS 128                // number of phase bins for folding the data
+#define TOTAL_SAMPLES 10240000               // total number of complex samples in each pol in an 1.28 MHz 8 second MWA subfile
+#define FFT_SIZE 200                         // FFT length for channelisation
+#define SAMPLE_RATE 1280000.0f               // sample rate in Hz for 1.28 MHz bandwidth
+#define NUM_PHASE_BINS 256                   // number of phase bins for folding the data
 
-#define DEFAULT_HEADER_SIZE 32            // default is VDIF
-#define DEFAULT_DATA_FRAME_SIZE 8192      // 8192 bytes
-#define DEFAULT_NUM_INPUT_BITS 8          // twice this for a complex sample
-#define DEFAULT_SKY_FREQUENCY_MHZ 150.0f  // centre frequency in MHz
+#define DEFAULT_HEADER_SIZE 32               // default is VDIF
+#define DEFAULT_DATA_FRAME_SIZE 8192         // 8192 bytes
+#define DEFAULT_NUM_INPUT_BITS 8             // twice this for a complex sample
+#define DEFAULT_CENTRE_FREQUENCY_MHZ 150.0f  // centre frequency in MHz
 #define DEFAULT_OUTPUT_FILENAME "pulse_profile.dat"
 
 void usage()
@@ -39,15 +39,15 @@ void usage()
     "         -u                if this option is present, data is assumed to be unsigned (default is signed)\n"
     "         -P <period>       period at which to fold the data (diagnostic) [default no folding]\n"
     "         -D <num>          DM for incoherent de-dispersion [default no de-dispersion]\n"
+    "         -O <offset>       non-negative phase offset time in seconds (to place the pulse at a desired phase) [default 0.0 s]\n"
     "         -f <freq>         centre frequency in MHz (for de-dispersion) [default %f MHz]\n"
-    "         -s                apply an FFT-shift to the output spectrum\n"
     "         -l                output the pulse profile in log scale (dB)\n"
     "         -n                number of frames to process - minimum 1 [default all frames in the input file]\n"
     "         -N                normalise the output pulse profile peak to 1.0 (0.0 for log output)\n"
     "         -i                input filename\n"
     "         -o                output filename [default %s]\n"
     "         -h                print this usage information\n\n",
-    DEFAULT_HEADER_SIZE, DEFAULT_DATA_FRAME_SIZE, DEFAULT_NUM_INPUT_BITS, DEFAULT_SKY_FREQUENCY_MHZ, DEFAULT_OUTPUT_FILENAME);
+    DEFAULT_HEADER_SIZE, DEFAULT_DATA_FRAME_SIZE, DEFAULT_NUM_INPUT_BITS, DEFAULT_CENTRE_FREQUENCY_MHZ, DEFAULT_OUTPUT_FILENAME);
 }
 
 
@@ -64,8 +64,8 @@ int main(int argc, char *argv[])
     {"u",           no_argument,       0, 'u'},
     {"P",           required_argument, 0, 'P'},
     {"D",           required_argument, 0, 'D'},
+    {"O",           required_argument, 0, 'O'},
     {"f",           required_argument, 0, 'f'},
-    {"s",           no_argument,       0, 's'},
     {"l",           no_argument,       0, 'l'},
     {"n",           required_argument, 0, 'n'},
     {"N",           no_argument,       0, 'N'},
@@ -80,7 +80,6 @@ int main(int argc, char *argv[])
   in_fname[0]= '\0';  // empty string
   char out_fname[200] = DEFAULT_OUTPUT_FILENAME;
 
-  int fft_shift = 0;   // no FFT-shift to output by default
   int log_output = 0;  // linear power output by default
   int frames_to_process = -1;  // process all frames by default
   int normalise_output = 0;  // do not normalise the output by default 
@@ -90,12 +89,13 @@ int main(int argc, char *argv[])
   int format = 0;              // 0 = signed (default), 1 = unsigned
   float folding_period = 1.0;  // default folding period to prevent divide by zero
   float folding_dm = 0.0;
-  float sky_frequency_MHz = DEFAULT_SKY_FREQUENCY_MHZ;
+  float phase_offset_time = 0.0f;  // in seconds
+  float centre_frequency_MHz = DEFAULT_CENTRE_FREQUENCY_MHZ;
 
   // parse command line options
   while (1)
   {
-    opt = getopt_long_only(argc, argv, "H:d:b:uP:D:f:sln:Ni:o:h", options, NULL);
+    opt = getopt_long_only(argc, argv, "H:d:b:uP:D:O:f:ln:Ni:o:h", options, NULL);
     
     if (opt == EOF) break;
     
@@ -140,12 +140,17 @@ int main(int argc, char *argv[])
         folding_dm = atof(optarg);
         break;
 
-      case 'f':
-        sky_frequency_MHz = atof(optarg);
+      case 'O':
+        phase_offset_time = atof(optarg);
+        if (phase_offset_time < 0.0)
+        {
+          fprintf(stderr, "ERROR: bad -O option %s\n", optarg);
+          exit(EXIT_FAILURE);
+        }
         break;
 
-      case 's':
-        fft_shift = 1;
+      case 'f':
+        centre_frequency_MHz = atof(optarg);
         break;
 
       case 'l':
@@ -227,6 +232,7 @@ int main(int argc, char *argv[])
 
   // set the FFT size
   int samples_per_frame_per_pol = frame_dsize / (2*(bits_per_sample/4));  // number of complex samples per frame per pol
+  fprintf(stdout, "INFO: samples per frame per pol is %d\n", samples_per_frame_per_pol);
   int fft_size = FFT_SIZE;
   int samples_per_channel = TOTAL_SAMPLES / fft_size;
   fprintf(stdout, "INFO: channelising into %d channels, %d samples in each channel (number of FFTs)\n", fft_size, samples_per_channel);
@@ -357,29 +363,33 @@ int main(int argc, char *argv[])
   float *phase_bins = (float *)calloc(num_phase_bins, sizeof(float));          // bin values all initialised to zero
   int *num_values_per_bin = (int *)calloc(num_phase_bins, sizeof(int));        // bin counts all initialised to zero
   float *channel_dm_time_offsets = (float *)malloc(fft_size * sizeof(float));  // in seconds
-  float lowest_freq_MHz = sky_frequency_MHz - (0.5E-6 * (float)SAMPLE_RATE);
   float fine_chan_width_MHz = (1.0E-6 * (float)SAMPLE_RATE) / (float)fft_size;
   float max_offset = -10.0;  // set to a large negative number initially
-  for (int channel = 0; channel < fft_size; channel++)   // the channel number in ascending sky frequency order
+  int channel;   // the channel number in ascending sky frequency order
+  for (int c = 0; c < fft_size; c++)
   {
-    float channel_freq_MHz = lowest_freq_MHz + ((float)channel * fine_chan_width_MHz);
-    if (channel_freq_MHz != 0.0f)
-      channel_dm_time_offsets[channel] = 4.148808 * folding_dm / (channel_freq_MHz * channel_freq_MHz);  // in seconds (4.148808 is dispersion constant MHz^2 cm^3 pc^-1 s)
+    if (c <= (fft_size / 2))
+      channel = c;
     else
-      channel_dm_time_offsets[channel] = 0.0f;
-    if (channel_dm_time_offsets[channel] > max_offset) max_offset = channel_dm_time_offsets[channel];
+      channel = c - fft_size;
+    float channel_freq_MHz = centre_frequency_MHz + ((float)channel * fine_chan_width_MHz);
+    if (channel_freq_MHz != 0.0f)
+      channel_dm_time_offsets[c] = 4.148808E3 * folding_dm / (channel_freq_MHz * channel_freq_MHz);  // in seconds (4.148808E3 is dispersion constant MHz^2 cm^3 pc^-1 s)
+    else
+      channel_dm_time_offsets[c] = 0.0f;
+    if (channel_dm_time_offsets[c] > max_offset) max_offset = channel_dm_time_offsets[c];
   }
   // adjust the offsets so that the largest is zero, and all others are negative
-  for (int channel = 0; channel < fft_size; channel++)
+  for (int c = 0; c < fft_size; c++)
   {
-    channel_dm_time_offsets[channel] -= max_offset;
-    if (channel_dm_time_offsets[channel] > 0.0f)   // just in case of rounding error
-      channel_dm_time_offsets[channel] = 0.0f;
+    channel_dm_time_offsets[c] -= max_offset;
+    if (channel_dm_time_offsets[c] > 0.0f)   // just in case of rounding error
+      channel_dm_time_offsets[c] = 0.0f;
   }
   #if 1  // debug
-  for (int channel = 0; channel < fft_size; channel++)
+  for (int c = 0; c < fft_size; c++)
   {
-    fprintf(stdout, "channel %4d: DM time offset = %.6f ms\n", channel, channel_dm_time_offsets[channel]*1.0E3);
+    fprintf(stdout, "channel %4d: DM time offset = %.6f s\n", c, channel_dm_time_offsets[c]);
   }
   #endif
 
@@ -389,7 +399,7 @@ int main(int argc, char *argv[])
   int i, j;
   for (i = 0; i < fft_size; i++)
   {
-    float start_time = 1.0f - channel_dm_time_offsets[i];  // in seconds, should not be negative (offsets are <= 0.0)
+    float start_time = phase_offset_time - channel_dm_time_offsets[i];  // in seconds, should not be negative (offsets are <= 0.0)
 
     // apply incoherent de-dispersion
     if (start_time < 0.0)  // guarantee not negative (in case of rounding errors)
