@@ -6,31 +6,35 @@
 // - only 8 bit supported at present
 // - saves a cumulative profile that is updated each time the program is run, summing
 //   the profile for the current subfile with a loaded profile from past runs
+// - the MJD seconds from the first frame of the input VDIF file is used to
+//   determine the folding phase offset, so input VDIF files do not have to be contiguous
 // - to obtain the profile for just the current subfile, specify an all-zeros input profile
 //
-// Build: gcc -o fold_vdif_cumulative fold_vdif_cumulative.c -lfftw3 -lm
+// Build: gcc -o fold_vdif_cumulative fold_vdif_cumulative.c -lfftw3 -lm -lvdifio
 //
 // Ian Morrison December 2025
 
 // system include files
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <getopt.h>
 #include <math.h>
 #include <complex.h>
 #include <fftw3.h>
-//#include <vdifio.h>
+#include <vdifio.h>
 
-#define TOTAL_SAMPLES 10240000               // total number of complex samples in each pol in an 1.28 MHz 8 second MWA subfile
-#define FFT_SIZE 200                         // FFT length for channelisation
-#define SAMPLE_RATE 1280000.0f               // sample rate in Hz for 1.28 MHz bandwidth
+#define TOTAL_SAMPLES 10240000                // total number of complex samples in each pol in an 1.28 MHz 8 second MWA subfile
+#define FFT_SIZE 200                          // FFT length for channelisation
+#define SAMPLE_RATE 1280000.0                 // sample rate in Hz for 1.28 MHz bandwidth
 
-#define DEFAULT_HEADER_SIZE 32               // default is VDIF
-#define DEFAULT_DATA_FRAME_SIZE 8192         // 8192 bytes
-#define DEFAULT_NUM_INPUT_BITS 8             // twice this for a complex sample
-#define DEFAULT_CENTRE_FREQUENCY_MHZ 150.0f  // centre frequency in MHz
-#define DEFAULT_NUM_PHASE_BINS 256           // number of phase bins for folding the data
+#define DEFAULT_HEADER_SIZE 32                // default is VDIF
+#define DEFAULT_DATA_FRAME_SIZE 8192          // 8192 bytes
+#define DEFAULT_NUM_INPUT_BITS 8              // twice this for a complex sample
+#define DEFAULT_CENTRE_FREQUENCY_MHZ 150.0    // centre frequency in MHz
+#define DEFAULT_MJD_START_SECONDS 5200000000L //
+#define DEFAULT_NUM_PHASE_BINS 256            // number of phase bins for folding the data
 #define DEFAULT_PROFILE_FILENAME "pulse_profile.dat"
 
 void usage()
@@ -44,15 +48,15 @@ void usage()
     "         -B <int>          number of phase bins for folding the data [default %d]\n"
     "         -P <period>       period at which to fold the data (diagnostic) [default no folding]\n"
     "         -D <num>          DM for incoherent de-dispersion [default no de-dispersion]\n"
-    "         -O <offset>       non-negative phase offset time in seconds (to place the pulse at a desired phase) [default 0.0 s]\n"
+    "         -M <num>          MJD seconds for the start of folding (must be earlier than the MJS seconds of any VDIF file input) [default %lu]\n"
     "         -f <freq>         centre frequency in MHz (for de-dispersion) [default %f MHz]\n"
     "         -l                output the pulse profile in log scale (dB)\n"
-    "         -n <int>               number of frames to process - minimum 1 [default all frames in the input file]\n"
+    "         -n <int>          number of frames to process - minimum 1 [default all frames in the input file]\n"
     "         -N                normalise the output pulse profile peak to 1.0 (0.0 for log output)\n"
     "         -i <filename>     input VDIF filename"
     "         -p <filename>     input/output pulse profile filename [default %s]\n"
     "         -h                print this usage information\n\n",
-    DEFAULT_HEADER_SIZE, DEFAULT_DATA_FRAME_SIZE, DEFAULT_NUM_INPUT_BITS, DEFAULT_NUM_PHASE_BINS, DEFAULT_CENTRE_FREQUENCY_MHZ, DEFAULT_PROFILE_FILENAME);
+    DEFAULT_HEADER_SIZE, DEFAULT_DATA_FRAME_SIZE, DEFAULT_NUM_INPUT_BITS, DEFAULT_NUM_PHASE_BINS, DEFAULT_MJD_START_SECONDS, DEFAULT_CENTRE_FREQUENCY_MHZ, DEFAULT_PROFILE_FILENAME);
 }
 
 
@@ -70,7 +74,7 @@ int main(int argc, char *argv[])
     {"B",           required_argument, 0, 'B'},
     {"P",           required_argument, 0, 'P'},
     {"D",           required_argument, 0, 'D'},
-    {"O",           required_argument, 0, 'O'},
+    {"M",           required_argument, 0, 'M'},
     {"f",           required_argument, 0, 'f'},
     {"l",           no_argument,       0, 'l'},
     {"n",           required_argument, 0, 'n'},
@@ -94,15 +98,15 @@ int main(int argc, char *argv[])
   int bits_per_sample = DEFAULT_NUM_INPUT_BITS;  // 2x this for full complex sample
   int format = 0;              // 0 = signed (default), 1 = unsigned
   int num_phase_bins = DEFAULT_NUM_PHASE_BINS;
-  float folding_period = 1.0;  // default folding period to prevent divide by zero
-  float folding_dm = 0.0;
-  float phase_offset_time = 0.0f;  // in seconds
-  float centre_frequency_MHz = DEFAULT_CENTRE_FREQUENCY_MHZ;
+  double folding_period = 1.0;  // default folding period to prevent divide by zero
+  double folding_dm = 0.0;
+  uint64_t folding_start_mjd_seconds = DEFAULT_MJD_START_SECONDS;
+  double centre_frequency_MHz = DEFAULT_CENTRE_FREQUENCY_MHZ;
 
   // parse command line options
   while (1)
   {
-    opt = getopt_long_only(argc, argv, "H:d:b:uB:P:D:O:f:ln:Ni:p:h", options, NULL);
+    opt = getopt_long_only(argc, argv, "H:d:b:uB:P:D:M:f:ln:Ni:p:h", options, NULL);
     
     if (opt == EOF) break;
     
@@ -156,11 +160,11 @@ int main(int argc, char *argv[])
         folding_dm = atof(optarg);
         break;
 
-      case 'O':
-        phase_offset_time = atof(optarg);
-        if (phase_offset_time < 0.0)
+      case 'M':
+        folding_start_mjd_seconds = atoi(optarg);
+        if (folding_start_mjd_seconds < DEFAULT_MJD_START_SECONDS)
         {
-          fprintf(stderr, "ERROR: bad -O option %s\n", optarg);
+          fprintf(stderr, "ERROR: bad -M option %s, folding precision will be degraded\n", optarg);
           exit(EXIT_FAILURE);
         }
         break;
@@ -294,13 +298,20 @@ int main(int argc, char *argv[])
   else              // unsigned data
     data_mask = 1 << (bits_per_sample - 1);   // will be 0x80 for 8-bit data, 0x8000 for 16-bit data
 
-  // read the input file and process all available frames
+  // read the input VDIF file and process all available frames
   size_t bytes_read;
   long int frames_read = 0;
-  
+  uint64_t first_mjd_secs_this_file;
+
   for (int frame = 0; frame < total_frames; frame++)
   {
-    bytes_read = fread(input_frame, 1, frame_hsize, fp_vdif);    // read the header bytes - which are ignored
+    bytes_read = fread(input_frame, 1, frame_hsize, fp_vdif);    // read the header bytes
+    if (frame == 0)
+    {
+      first_mjd_secs_this_file = getVDIFFrameMJDSec((vdif_header *)input_frame);
+      fprintf(stdout, "MJD seconds of first frame of the current VDIF input file = %lu\n", first_mjd_secs_this_file);
+    }
+
     bytes_read = fread(input_frame, 1, frame_dsize, fp_vdif);    // overwrite with the data
 
     if (frame == 0)
@@ -392,10 +403,10 @@ int main(int argc, char *argv[])
   // at this point we have Stokes I power samples in power_both_pols[] array, channelised
 
   fprintf(stdout, "Folding each fine channel\n");
-  int *num_values_per_bin = (int *)calloc(num_phase_bins, sizeof(int));        // bin counts all initialised to zero
-  float *channel_dm_time_offsets = (float *)malloc(fft_size * sizeof(float));  // in seconds
-  float fine_chan_width_MHz = (1.0E-6 * (float)SAMPLE_RATE) / (float)fft_size;
-  float max_offset = -10.0;  // set to a large negative number initially
+  int *num_values_per_bin = (int *)calloc(num_phase_bins, sizeof(int));           // bin counts all initialised to zero
+  double *channel_dm_time_offsets = (double *)malloc(fft_size * sizeof(double));  // in seconds
+  double max_offset = -10.0;  // set to a large negative number initially
+  double fine_chan_width_MHz = (1.0E-6 * (double)SAMPLE_RATE) / (double)fft_size;
   int channel;   // the channel number in ascending sky frequency order
   for (int c = 0; c < fft_size; c++)
   {
@@ -403,7 +414,7 @@ int main(int argc, char *argv[])
       channel = c;
     else
       channel = c - fft_size;
-    float channel_freq_MHz = centre_frequency_MHz + ((float)channel * fine_chan_width_MHz);
+    double channel_freq_MHz = centre_frequency_MHz + ((double)channel * fine_chan_width_MHz);
     if (channel_freq_MHz != 0.0f)
       channel_dm_time_offsets[c] = 4.148808E3 * folding_dm / (channel_freq_MHz * channel_freq_MHz);  // in seconds (4.148808E3 is dispersion constant MHz^2 cm^3 pc^-1 s)
     else
@@ -414,8 +425,8 @@ int main(int argc, char *argv[])
   for (int c = 0; c < fft_size; c++)
   {
     channel_dm_time_offsets[c] -= max_offset;
-    if (channel_dm_time_offsets[c] > 0.0f)   // just in case of rounding error
-      channel_dm_time_offsets[c] = 0.0f;
+    if (channel_dm_time_offsets[c] > 0.0)   // just in case of rounding error
+      channel_dm_time_offsets[c] = 0.0;
   }
   #if 1  // debug
   for (int c = 0; c < fft_size; c++)
@@ -424,13 +435,13 @@ int main(int argc, char *argv[])
   }
   #endif
 
-  float sample_period = fft_size / SAMPLE_RATE;          // time between successive samples in each channel
+  double sample_period = (double)fft_size / SAMPLE_RATE;          // time between successive samples in each channel
 
   // fold each channel separately, applying incoherent de-dispersion if requested
   int i, j;
   for (i = 0; i < fft_size; i++)
   {
-    float start_time = phase_offset_time - channel_dm_time_offsets[i];  // in seconds, should not be negative (offsets are <= 0.0)
+    double start_time = (double)(first_mjd_secs_this_file - folding_start_mjd_seconds) - channel_dm_time_offsets[i];  // in seconds, should not be negative (if MJD offsets are >= 0.0)
 
     // apply incoherent de-dispersion
     if (start_time < 0.0)  // guarantee not negative (in case of rounding errors)
@@ -440,8 +451,8 @@ int main(int argc, char *argv[])
     // - first sample is at start_time, increment by sample_period on each successive sample
     for (j = 0; j < samples_per_channel; j++)
     {
-      float fractional_period = fmodf(start_time, folding_period) / folding_period;   // range is [0.0, 1.0)], with the value 1.0 possible but unlikely
-      int phase_bin = (int)floorf(fractional_period * (float)num_phase_bins);         // range is [0, num_phase_bins)], with the value num_phase_bins possible but unlikely
+      double fractional_period = fmod(start_time, folding_period) / folding_period;   // range is [0.0, 1.0)], with the value 1.0 possible but unlikely
+      int phase_bin = (int)floor(fractional_period * (double)num_phase_bins);         // range is [0, num_phase_bins)], with the value num_phase_bins possible but unlikely
       if (phase_bin == num_phase_bins) phase_bin = num_phase_bins - 1;                // ensures range is [0, num_phase_bins-1]
       num_values_per_bin[phase_bin]++;
       phase_bins[phase_bin] += power_both_pols[j * fft_size + i];
