@@ -33,7 +33,7 @@
 #define DEFAULT_DATA_FRAME_SIZE 8192          // 8192 bytes
 #define DEFAULT_NUM_INPUT_BITS 8              // twice this for a complex sample
 #define DEFAULT_CENTRE_FREQUENCY_MHZ 150.0    // centre frequency in MHz
-#define DEFAULT_MJD_START_SECONDS 5200000000L //
+#define DEFAULT_MJD_START_SECONDS 5180000000L //
 #define DEFAULT_NUM_PHASE_BINS 256            // number of phase bins for folding the data
 #define DEFAULT_PROFILE_FILENAME "pulse_profile.dat"
 
@@ -53,7 +53,7 @@ void usage()
     "         -l                output the pulse profile in log scale (dB)\n"
     "         -n <int>          number of frames to process - minimum 1 [default all frames in the input file]\n"
     "         -N                normalise the output pulse profile peak to 1.0 (0.0 for log output)\n"
-    "         -i <filename>     input VDIF filename"
+    "         -i <filename>     input VDIF filename\n"
     "         -p <filename>     input/output pulse profile filename [default %s]\n"
     "         -h                print this usage information\n\n",
     DEFAULT_HEADER_SIZE, DEFAULT_DATA_FRAME_SIZE, DEFAULT_NUM_INPUT_BITS, DEFAULT_NUM_PHASE_BINS, DEFAULT_MJD_START_SECONDS, DEFAULT_CENTRE_FREQUENCY_MHZ, DEFAULT_PROFILE_FILENAME);
@@ -161,7 +161,8 @@ int main(int argc, char *argv[])
         break;
 
       case 'M':
-        folding_start_mjd_seconds = atoi(optarg);
+        folding_start_mjd_seconds = atol(optarg);
+        fprintf(stdout, "Folding start MJD seconds = %lu\n", folding_start_mjd_seconds);
         if (folding_start_mjd_seconds < DEFAULT_MJD_START_SECONDS)
         {
           fprintf(stderr, "ERROR: bad -M option %s, folding precision will be degraded\n", optarg);
@@ -251,21 +252,21 @@ int main(int argc, char *argv[])
   fprintf(stdout, "INFO: input/output profile file = %s\n", profile_fname);
 
   // read in the existing profile data
-  float *phase_bins = (float *)malloc(num_phase_bins * sizeof(float));
+  float *previous_phase_bins = (float *)malloc(num_phase_bins * sizeof(float));
   for (int i = 0; i < num_phase_bins; i++)
   {
     float bin_value;
     int ret = fscanf(fp_profile, "%f", &bin_value);
     if (ret == 1)
     {
-      phase_bins[i] = bin_value;
+      previous_phase_bins[i] = bin_value;
     }
     else
     {
       fprintf(stderr, "ERROR: cannot read bin %d from profile file %s\n", i, profile_fname);
       fclose(fp_vdif);
       fclose(fp_profile);
-      free(phase_bins);
+      free(previous_phase_bins);
       exit(EXIT_FAILURE);
     }
   }
@@ -403,6 +404,7 @@ int main(int argc, char *argv[])
   // at this point we have Stokes I power samples in power_both_pols[] array, channelised
 
   fprintf(stdout, "Folding each fine channel\n");
+  float *phase_bins = (float *)calloc(num_phase_bins, sizeof(float));             // bin values all initialised to zero
   int *num_values_per_bin = (int *)calloc(num_phase_bins, sizeof(int));           // bin counts all initialised to zero
   double *channel_dm_time_offsets = (double *)malloc(fft_size * sizeof(double));  // in seconds
   double max_offset = -10.0;  // set to a large negative number initially
@@ -441,9 +443,10 @@ int main(int argc, char *argv[])
   int i, j;
   for (i = 0; i < fft_size; i++)
   {
-    double start_time = (double)(first_mjd_secs_this_file - folding_start_mjd_seconds) - channel_dm_time_offsets[i];  // in seconds, should not be negative (if MJD offsets are >= 0.0)
+    double start_time = (double)first_mjd_secs_this_file - (double)folding_start_mjd_seconds - channel_dm_time_offsets[i];  // in seconds, should not be negative (if MJD offsets are >= 0.0)
 
-    // apply incoherent de-dispersion
+    //fprintf(stdout, "Folding channel %4d starting at time %.6f s\n", i, start_time);
+
     if (start_time < 0.0)  // guarantee not negative (in case of rounding errors)
       start_time = 0.0;
 
@@ -460,6 +463,12 @@ int main(int argc, char *argv[])
       // next sample
       start_time += sample_period;
     }
+  }
+
+  // scale the output profile by the number of values added to each bin and sum with previous profile
+  for (i = 0; i < num_phase_bins; i++)
+  {
+    phase_bins[i] = (phase_bins[i] / (float)num_values_per_bin[i]) + previous_phase_bins[i];
   }
 
   // reopen the profile file for writing the updated profile
