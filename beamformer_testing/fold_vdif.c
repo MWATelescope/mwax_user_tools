@@ -427,13 +427,18 @@ int main(int argc, char *argv[])
     }
   }
 
+  // scale the output profile by the number of values added to each bin
+  for (i = 0; i < num_phase_bins; i++)
+  {
+    phase_bins[i] = phase_bins[i] / (float)num_values_per_bin[i];
+  }
+
   if (normalise_output)
   {
     // find the maximum bin value
     float max_bin_value = -1.0f;
     for (i = 0; i < num_phase_bins; i++)
     {
-      phase_bins[i] = phase_bins[i] / (float)num_values_per_bin[i];
       if (phase_bins[i] > max_bin_value) max_bin_value = phase_bins[i];
     }
     if (max_bin_value == 0.0) max_bin_value = 1.0;  // don't normalise in zero case (avoids nan errors)
