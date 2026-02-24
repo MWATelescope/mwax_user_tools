@@ -31,7 +31,7 @@
 
 void usage()
 {
-  fprintf(stdout, "\fold_vdif - fold a VDIF file at a specified period and DM\n\n"
+  fprintf(stdout, "\nfold_vdif - fold a VDIF file at a specified period and DM\n\n"
     "  Usage: fold_vdif <options>\n"
     "         -H <int>          header size in bytes (0 for raw data, 32 for VDIF, 64 for CODIF) [default %d]\n"
     "         -d <int>          data frame size in bytes [default %d]\n"
@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
   int bits_per_sample = DEFAULT_NUM_INPUT_BITS;  // 2x this for full complex sample
   int format = 0;              // 0 = signed (default), 1 = unsigned
   int num_phase_bins = DEFAULT_NUM_PHASE_BINS;
-  float folding_period = 1.0;  // default folding period to prevent divide by zero
+  double folding_period = 1.0;  // default folding period to prevent divide by zero
   float folding_dm = 0.0;
   float phase_offset_time = 0.0f;  // in seconds
   float centre_frequency_MHz = DEFAULT_CENTRE_FREQUENCY_MHZ;
@@ -400,13 +400,13 @@ int main(int argc, char *argv[])
   }
   #endif
 
-  float sample_period = fft_size / SAMPLE_RATE;          // time between successive samples in each channel
+  double sample_period = fft_size / SAMPLE_RATE;          // time between successive samples in each channel
 
   // fold each channel separately, applying incoherent de-dispersion if requested
   int i, j;
   for (i = 0; i < fft_size; i++)
   {
-    float start_time = phase_offset_time - channel_dm_time_offsets[i];  // in seconds, should not be negative (offsets are <= 0.0)
+    double start_time = phase_offset_time - channel_dm_time_offsets[i];  // in seconds, should not be negative (offsets are <= 0.0)
 
     // apply incoherent de-dispersion
     if (start_time < 0.0)  // guarantee not negative (in case of rounding errors)
@@ -416,8 +416,8 @@ int main(int argc, char *argv[])
     // - first sample is at start_time, increment by sample_period on each successive sample
     for (j = 0; j < samples_per_channel; j++)
     {
-      float fractional_period = fmodf(start_time, folding_period) / folding_period;   // range is [0.0, 1.0)], with the value 1.0 possible but unlikely
-      int phase_bin = (int)floorf(fractional_period * (float)num_phase_bins);         // range is [0, num_phase_bins)], with the value num_phase_bins possible but unlikely
+      double fractional_period = fmod(start_time, folding_period) / folding_period;   // range is [0.0, 1.0)], with the value 1.0 possible but unlikely
+      int phase_bin = (int)floor(fractional_period * (double)num_phase_bins);         // range is [0, num_phase_bins)], with the value num_phase_bins possible but unlikely
       if (phase_bin == num_phase_bins) phase_bin = num_phase_bins - 1;                // ensures range is [0, num_phase_bins-1]
       num_values_per_bin[phase_bin]++;
       phase_bins[phase_bin] += power_both_pols[j * fft_size + i];
