@@ -20,7 +20,7 @@
 
 #define TOTAL_SAMPLES 10240000               // total number of complex samples in each pol in an 1.28 MHz 8 second MWA subfile
 #define FFT_SIZE 200                         // FFT length for channelisation
-#define SAMPLE_RATE 1280000.0f               // sample rate in Hz for 1.28 MHz bandwidth
+#define SAMPLE_RATE 1280000.0                // sample rate in Hz for 1.28 MHz bandwidth
 
 #define DEFAULT_HEADER_SIZE 32               // default is VDIF
 #define DEFAULT_DATA_FRAME_SIZE 8192         // 8192 bytes
@@ -400,7 +400,7 @@ int main(int argc, char *argv[])
   }
   #endif
 
-  double sample_period = fft_size / SAMPLE_RATE;          // time between successive samples in each channel
+  double sample_period = (double)fft_size / SAMPLE_RATE;          // time between successive samples in each channel
 
   // fold each channel separately, applying incoherent de-dispersion if requested
   int i, j;
