@@ -633,6 +633,7 @@ int main(int argc, char *argv[])
 
   // Calc snr
   fprintf(stdout, "INFO: estimating SNR of the pulse profile...\n");
+  printf("DEBUG: num_phase_bins = %d\n", num_phase_bins);
   double snr = calc_pulsar_snr(y_axis, num_phase_bins);
   fprintf(stdout, "INFO: estimated SNR of the pulse profile is %f\n", snr);
 

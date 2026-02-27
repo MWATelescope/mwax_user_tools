@@ -1,4 +1,4 @@
-
+#include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -27,9 +27,20 @@ static void calc_stats(const double *profile, const int *mask, int nbins,
 
 double calc_pulsar_snr(const double *profile, int nbins)
 {
+    printf("DEBUG: nbins = %d\n", nbins);
+    printf("DEBUG: first few profile values: %f %f %f %f\n", profile[0], profile[1], profile[2], profile[3]);
     // Start by assuming all bins are off-pulse
-    int mask[nbins];
-    memset(mask, 1, sizeof(mask));
+    int *mask = malloc(nbins * sizeof(int));
+    if (!mask)
+        return -1.0;
+    for (int i = 0; i < nbins; i++)
+        mask[i] = 1;
+
+    // debug - verify mask
+    int check = 0;
+    for (int i = 0; i < nbins; i++)
+        check += mask[i];
+    printf("DEBUG: initial mask sum = %d (should be %d)\n", check, nbins);
 
     double mean, std;
 
@@ -75,6 +86,8 @@ double calc_pulsar_snr(const double *profile, int nbins)
     printf("INFO: off-pulse std  = %.4f\n", std);
     printf("INFO: peak           = %.4f\n", peak + mean);
     printf("INFO: SNR            = %.2f\n", snr);
+
+    free(mask);
 
     return snr;
 }
