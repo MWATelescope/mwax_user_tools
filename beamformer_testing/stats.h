@@ -1,0 +1,1 @@
+double calc_pulsar_snr(const double *profile, int nbins);

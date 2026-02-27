@@ -5,7 +5,7 @@
 // - assumes the two pols are interleaved
 // - only 8 bit supported at present
 //
-// Build: gcc -O3 -o fold_vdif fold_vdif.c plot.c -lfftw3 -lm
+// Build: gcc -O3 -o fold_vdif fold_vdif.c plot.c stats.c -lfftw3 -lm -Wall -Wextra
 //
 // Ian Morrison November 2025
 
@@ -19,6 +19,7 @@
 #include <complex.h>
 #include <fftw3.h>
 #include "plot.h"
+#include "stats.h"
 
 #define FFT_SIZE 200          // FFT length for channelisation
 #define SAMPLE_RATE 1280000.0 // sample rate in Hz for 1.28 MHz bandwidth
@@ -629,6 +630,11 @@ int main(int argc, char *argv[])
                            x_axis,
                            y_axis,
                            num_phase_bins);
+
+  // Calc snr
+  fprintf(stdout, "INFO: estimating SNR of the pulse profile...\n");
+  double snr = calc_pulsar_snr(y_axis, num_phase_bins);
+  fprintf(stdout, "INFO: estimated SNR of the pulse profile is %f\n", snr);
 
   // Free the x_axis and y_axis after plotting
   free(x_axis);
