@@ -20,7 +20,7 @@ This example will:
 * Move the period offset by 0.12 (shifts the pulse left or right)
 * Specify central frequency of 168.96 MHz (based on the central frequency of the coarse channel)
 * Output the pulse profile data as `pulse_profile.dat`
-* Output the pulse profile plot as `pulse_profile.png`
+* Output the pulse profile plot as `pulse_profile_OBSID_chCCC_beamBB.png"`
 
 ```bash
 ./fold_vdif -s 4 -H 32 -d 8000 -b 8 -u -B 256 -P 1.2381 -D 40.9 -O 0.12 -f 168.96 -i /data/1455894016/1455894016_ch132_beam01.vdif

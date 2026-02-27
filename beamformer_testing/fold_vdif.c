@@ -32,17 +32,23 @@
 #define DEFAULT_NUM_PHASE_BINS 128          // number of phase bins for folding the data
 #define DEFAULT_OUTPUT_FILENAME "pulse_profile.dat"
 
-int get_obsid_from_filename(const char *filename)
+int parse_vdif_filename(const char *path,
+                        int *obsid,
+                        int *channel,
+                        int *beam)
 {
-  // Find last '/', then step past it
-  const char *fname = strrchr(filename, '/');
-  fname = fname ? fname + 1 : filename; // handle no '/' case
+  // Step past the last '/'
+  const char *fname = strrchr(path, '/');
+  fname = fname ? fname + 1 : path;
 
-  char dest[11];
-  strncpy(dest, fname, 10);
-  dest[10] = '\0';
+  // Parse fields using sscanf
+  if (sscanf(fname, "%10d_ch%d_beam%d", obsid, channel, beam) != 3)
+  {
+    fprintf(stderr, "ERROR: could not parse filename '%s'\n", fname);
+    return -1;
+  }
 
-  return atoi(dest);
+  return 0;
 }
 
 long get_file_size(const char *filename)
@@ -267,7 +273,14 @@ int main(int argc, char *argv[])
     exit(EXIT_FAILURE);
   }
 
-  int obsid = get_obsid_from_filename(in_fname);
+  int obsid = 0, rec_channel = 0, beam = 0;
+
+  if (parse_vdif_filename(in_fname, &obsid, &rec_channel, &beam) != 0)
+  {
+    fprintf(stderr, "ERROR: could not parse input filename %s\n", in_fname);
+    exit(EXIT_FAILURE);
+  }
+
   int frame_size = frame_hsize + frame_dsize;
   long total_frames = file_size / frame_size;
   // 4 because each complex sample has 2 pols and each pol has real and imag parts, each of bits_per_sample bits
@@ -290,7 +303,9 @@ int main(int argc, char *argv[])
   int selected_start_frame = (int)((double)start_time * SAMPLE_RATE / samples_per_frame);
   int selected_end_frame = (int)((double)end_time * SAMPLE_RATE / samples_per_frame);
 
-  printf("INFO: OBSID: %d\n\n", obsid);
+  printf("INFO: OBSID: %d\n", obsid);
+  printf("INFO: channel: %d\n", rec_channel);
+  printf("INFO: beam number: %d\n\n", beam);
   printf("INFO: input file size is %ld bytes\n", file_size);
   printf("INFO: frame size is %d bytes (header %d + data %d)\n", frame_size, frame_hsize, frame_dsize);
   printf("INFO: total frames in the file is %ld\n", total_frames);
@@ -343,7 +358,6 @@ int main(int argc, char *argv[])
   fftw_complex *output_pol0 = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * selected_samples);
   fftw_complex *output_pol1 = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * selected_samples);
   double *input_double;
-  double *output_double;
   fftw_plan plan_pol0 = fftw_plan_dft_1d(fft_size, input_pol0, output_pol0, FFTW_FORWARD, FFTW_MEASURE);
   fftw_plan plan_pol1 = fftw_plan_dft_1d(fft_size, input_pol1, output_pol1, FFTW_FORWARD, FFTW_MEASURE);
   float *power_both_pols = (float *)malloc(selected_samples * sizeof(float));
@@ -377,7 +391,7 @@ int main(int argc, char *argv[])
     }
 #endif
 
-    if (bytes_read != frame_dsize)
+    if (bytes_read != (size_t)frame_dsize)
     {
       fprintf(stdout, "INFO: cannot read %d bytes from input file, assuming reached EOF\n", frame_dsize);
     }
@@ -441,6 +455,7 @@ int main(int argc, char *argv[])
   fftw_free(input_pol1);
 
 #if DEBUG
+  double *output_double;
   // print the first samples of the the channelised input file
   fprintf(stdout, "First complex voltage samples of the channelised input file:\n");
   for (int i = 0; i < 10; i++)
@@ -475,7 +490,7 @@ int main(int argc, char *argv[])
 
   // at this point we have Stokes I power samples in power_both_pols[] array, channelised
 
-  fprintf(stdout, "Folding each fine channel\n");
+  fprintf(stdout, "INFO: Folding each fine channel\n");
   float *phase_bins = (float *)calloc(num_phase_bins, sizeof(float));         // bin values all initialised to zero
   int *num_values_per_bin = (int *)calloc(num_phase_bins, sizeof(int));       // bin counts all initialised to zero
   float *channel_dm_time_offsets = (float *)malloc(fft_size * sizeof(float)); // in seconds
@@ -569,7 +584,7 @@ int main(int argc, char *argv[])
   }
 
   // print all the bin values, and also save to the output file
-  fprintf(stdout, "Pulse profile:\n");
+  fprintf(stdout, "INFO: Pulse profile:\n");
   for (i = 0; i < num_phase_bins; i++)
   {
     if (log_output)
@@ -602,9 +617,12 @@ int main(int argc, char *argv[])
 
   char title[200];
 
-  sprintf(title, "Folded Pulse Profile of obsid %d (%d sec; %d to %d)", obsid, selected_seconds, start_time, end_time);
+  sprintf(title, "Folded Pulse Profile of %d ch: %03d beam: %02d (%d sec; %d to %d)", obsid, rec_channel, beam, selected_seconds, start_time, end_time);
 
-  int ret = line_chart_png("pulse_profile.png",
+  char plot_filename[200];
+  sprintf(plot_filename, "pulse_profile_%d_ch%03d_beam%02d.png", obsid, rec_channel, beam);
+
+  int ret = line_chart_png(plot_filename,
                            title,
                            "",
                            "Power",
@@ -617,9 +635,8 @@ int main(int argc, char *argv[])
   free(y_axis);
 
   if (ret == 0)
-    fprintf(stdout, "INFO: pulse profile plot written to pulse_profile.png\n");
+    fprintf(stdout, "INFO: pulse profile plot written to %s\n", plot_filename);
 
-cleanup:
   // Close out file
   fclose(fp_out);
 
