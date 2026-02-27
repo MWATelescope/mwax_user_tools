@@ -5,7 +5,7 @@
 // - assumes the two pols are interleaved
 // - only 8 bit supported at present
 //
-// Build: gcc -o fold_vdif fold_vdif.c plot.c -lfftw3 -lm
+// Build: gcc -O3 -o fold_vdif fold_vdif.c plot.c -lfftw3 -lm
 //
 // Ian Morrison November 2025
 
@@ -404,6 +404,12 @@ int main(int argc, char *argv[])
   fprintf(stdout, "INFO: total number of frames read = %ld\n", frames_read);
   fprintf(stdout, "INFO: SELECTED frames read = %d\n", selected_frame);
 
+  // free unneeded memory
+  free(input_frame);
+
+  // Close input file
+  fclose(fp_in);
+
 #if DEBUG
   // print the first samples of the the input file
   fprintf(stdout, "First complex voltage samples of the input file:\n");
@@ -428,6 +434,12 @@ int main(int argc, char *argv[])
   }
   fprintf(stdout, "INFO: %d FFTs completed for each pol\n", samples_per_channel);
 
+  // destroy the FFTW stuff
+  fftw_destroy_plan(plan_pol0);
+  fftw_destroy_plan(plan_pol1);
+  fftw_free(input_pol0);
+  fftw_free(input_pol1);
+
 #if DEBUG
   // print the first samples of the the channelised input file
   fprintf(stdout, "First complex voltage samples of the channelised input file:\n");
@@ -447,6 +459,10 @@ int main(int argc, char *argv[])
     power_both_pols[i] = (float)(creal(output_pol0[i]) * creal(output_pol0[i]) + cimag(output_pol0[i]) * cimag(output_pol0[i]) +
                                  creal(output_pol1[i]) * creal(output_pol1[i]) + cimag(output_pol1[i]) * cimag(output_pol1[i]));
   }
+
+  // Free final fftw variables
+  fftw_free(output_pol0);
+  fftw_free(output_pol1);
 
 #if DEBUG
   // print the first powers
@@ -522,6 +538,10 @@ int main(int argc, char *argv[])
     }
   }
 
+  // free the  and DM time offsets array as we no longer need it
+  free(channel_dm_time_offsets);
+  free(power_both_pols);
+
   // scale the output profile by the number of values added to each bin
   for (i = 0; i < num_phase_bins; i++)
   {
@@ -561,6 +581,9 @@ int main(int argc, char *argv[])
     fprintf(fp_out, "%f\n", phase_bins[i]);
   }
 
+  // free unneeded memory
+  free(num_values_per_bin);
+
   // Do a plot
   double *x_axis = (double *)malloc(num_phase_bins * sizeof(double));
   for (i = 0; i < num_phase_bins; i++)
@@ -574,6 +597,9 @@ int main(int argc, char *argv[])
     y_axis[i] = (double)phase_bins[i];
   }
 
+  // Free phase_bins after copying to y_axis
+  free(phase_bins);
+
   char title[200];
 
   sprintf(title, "Folded Pulse Profile of obsid %d (%d sec; %d to %d)", obsid, selected_seconds, start_time, end_time);
@@ -585,31 +611,17 @@ int main(int argc, char *argv[])
                            x_axis,
                            y_axis,
                            num_phase_bins);
+
+  // Free the x_axis and y_axis after plotting
+  free(x_axis);
+  free(y_axis);
+
   if (ret == 0)
     fprintf(stdout, "INFO: pulse profile plot written to pulse_profile.png\n");
 
 cleanup:
-
-  fclose(fp_in);
+  // Close out file
   fclose(fp_out);
-
-  // free host memory
-  free(input_frame);
-  free(power_both_pols);
-  // free(summed_output);
-  // free(power_mag);
-  free(phase_bins);
-  free(num_values_per_bin);
-  free(channel_dm_time_offsets);
-  free(x_axis);
-
-  // destroy the FFTW stuff
-  fftw_destroy_plan(plan_pol0);
-  fftw_destroy_plan(plan_pol1);
-  fftw_free(input_pol0);
-  fftw_free(input_pol1);
-  fftw_free(output_pol0);
-  fftw_free(output_pol1);
 
   // final message
   fprintf(stdout, "INFO: all done, exiting\n\n");
