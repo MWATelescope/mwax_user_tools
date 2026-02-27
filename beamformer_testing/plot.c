@@ -26,12 +26,12 @@ int line_chart_png(const char *filename,
     fprintf(gp, "set ylabel '%s'\n", y_label);
 
     // --- Style ---
-    fprintf(gp, "set style line 1 lc rgb '#0060ad' lt 1 lw 2 pt 7 ps 0.5\n");
+    fprintf(gp, "set style line 1 lc rgb '#0060ad' lt 1 lw 2\n");
     fprintf(gp, "set grid\n");
     fprintf(gp, "set key off\n");
 
     // --- Send data inline via gnuplot's special '-' filename ---
-    fprintf(gp, "plot '-' with linespoints ls 1\n");
+    fprintf(gp, "plot '-' with lines ls 1\n");
     for (int i = 0; i < n; i++)
     {
         fprintf(gp, "%f %f\n", x[i], y[i]);
