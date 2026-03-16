@@ -1,51 +1,77 @@
-# fold_vdif: VDIF Folding utility
+# fold_and_plot.sh
 
-## Building
+A bash script to automate pulsar folding and plotting from VDIF observation data using the `cirapulsarsandtransients/psr-analysis` Docker image.
+
+## Overview
+
+For a given set of beamformer observations that prodced VDIF and associated HDR files, the script will:
+
+1. Run `dspsr` to fold each HDR file against a pulsar ephemeris (`.par` file), producing folded archive (`.ar`) files
+2. Combine the resulting `.ar` files using `psradd` (skipped if only one HDR file is found)
+3. Generate an integrated pulse profile plot using `pav`
+
+## Requirements
+
+- Docker
+- Input directory containing `.vdif`, `.hdr`
+- `.par` file to use for ephemeris. Get this by copying and pasting the "short" ephemeris from the [ATNF Pulsar Catalog](https://www.atnf.csiro.au/research/pulsar/psrcat/)
+- The `cirapulsarsandtransients/psr-analysis` Docker image
+
+## Usage
 
 ```bash
-gcc -o fold_vdif fold_vdif.c plot.c -lfftw3 -lm
+./fold_and_plot.sh \
+  --data-dir <dir> \
+  --output-dir <dir> \
+  --start-obsid <id> \
+  --end-obsid <id> \
+  --par <local path to file> \
+  --beam <num> \
+  --chan <num> \
+  [--threads <num>]
 ```
+
+## Arguments
+
+| Argument | Required | Description |
+|---|---|---|
+| `--data-dir` | Yes | Directory containing input VDIF, HDR, and PAR files |
+| `--output-dir` | Yes | Directory to write output `.ar` and `.png` files |
+| `--start-obsid` | Yes | 10-digit observation ID to start from (inclusive) |
+| `--end-obsid` | Yes | 10-digit observation ID to end at (inclusive) |
+| `--par` | Yes | PAR filename (filename, or full local path and filename) |
+| `--beam` | Yes | Zero-padded 2 digit beam number (e.g. `01`, `02`, etc) |
+| `--chan` | Yes | Zero-padded 3-digit receiver channel number (e.g. `091`, `123`, etc) |
+| `--threads` | No | Number of threads for `dspsr` (default: `2`) |
+
+## Output
+
+All output files are written to `--output-dir`:
+
+| File | Description |
+|---|---|
+| `<obsid>_ch<channel>_beam<beam>.ar` | Folded archive for each HDR file |
+| `beam<beam>_<par>_combined.ar` | Combined archive across all observations |
+| `beam<beam>_<par>_profile.png` | Integrated pulse profile plot |
 
 ## Example
 
-This example will:
-* Skip the first 4 seconds
-* Specify the VDIF file has a 32 byte header in each frame
-* Specify the VDIF file has a 8000 byte data block in each frame
-* Specify the VDIF uses 8 bits per sample
-* Speicfy the VDIF data is unsigned
-* Speicfy 256 phase bins for folding
-* Fold on a period of 1.2381 seconds
-* Use 40.9 as the dispersion measure
-* Move the period offset by 0.12 (shifts the pulse left or right)
-* Specify central frequency of 168.96 MHz (based on the central frequency of the coarse channel)
-* Output the pulse profile data as `pulse_profile.dat`
-* Output the pulse profile plot as `pulse_profile_OBSID_chCCC_beamBB.png"`
-
 ```bash
-./fold_vdif -s 4 -H 32 -d 8000 -b 8 -u -B 256 -P 1.2381 -D 40.9 -O 0.12 -f 168.96 -i /data/1455894016/1455894016_ch132_beam01.vdif
+./fold_and_plot.sh \
+  --data-dir /data/observations \
+  --output-dir /data/output \
+  --start-obsid 1234567890 \
+  --end-obsid 1234567899 \
+  --par /home/myuser/J0835-4510.par \
+  --beam 01 \
+  --chan 091 \
+  --threads 4
 ```
 
-## Usage
-```text
-fold_vdif - fold a VDIF file at a specified period and DM
+## Notes
 
-  Usage: fold_vdif <options>
-         -s <int>          start time in seconds for folding [default 0 s]
-         -e <int>          end time in seconds for folding [default -1 s]
-         -H <int>          header size in bytes (0 for raw data, 32 for VDIF, 64 for CODIF) [default 32]
-         -d <int>          data frame size in bytes [default 8000]
-         -b <int>          bits per sample (real and imag) [default 8]
-         -u                if this option is present, data is assumed to be unsigned (default is signed)
-         -B <int>          number of phase bins for folding the data [default 128]
-         -P <period>       period at which to fold the data (diagnostic) [default no folding]
-         -D <num>          DM for incoherent de-dispersion [default no de-dispersion]
-         -O <offset>       non-negative phase offset time in seconds (to place the pulse at a desired phase) [default 0.0 s]
-         -f <freq>         centre frequency in MHz (for de-dispersion) [default 150.000000 MHz]
-         -l                output the pulse profile in log scale (dB)
-         -n                number of frames to process - minimum 1 [default all frames in the input file]
-         -N                normalise the output pulse profile peak to 1.0 (0.0 for log output)
-         -i                input filename
-         -o                output filename [default pulse_profile.dat]
-         -h                print this usage information
-```
+- Only HDR files matching the specified channel, beam, and obsid range are processed
+- The first HDR file is processed with an additional `-S 4` flag to `dspsr` to skip the first 4 seconds to account for QUACKTIME
+- Output files are owned by the user running the script (not root)
+- Run `./fold_and_plot.sh --help` for a quick usage summary
+
