@@ -18,7 +18,7 @@ while [[ $# -gt 0 ]]; do
         --chan)         CHANNEL="ch$2";   shift 2 ;;
         --threads)     THREADS="$2";     shift 2 ;;
         --help)
-            echo "Usage: $0 --data-dir <dir> --output-dir <dir> --start-obsid <id> --end-obsid <id> --par <file> --beam <num> --channel <num> [--threads <num>]"
+            echo "Usage: $0 --data-dir <dir> --output-dir <dir> --start-obsid <id> --end-obsid <id> --par <file> --beam <num> --chan <num> [--threads <num>]"
             echo ""
             echo "  --data-dir      Directory containing VDIF, HDR and PAR files"
             echo "  --output-dir    Directory to write output .ar and .png files"
@@ -26,7 +26,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --end-obsid     10-digit end observation ID (inclusive)"
             echo "  --par           PAR filename (no path)"
             echo "  --beam          Zero-padded beam number (e.g. 01, 02)"
-            echo "  --channel       3-digit receiver channel number (e.g. 109)"
+            echo "  --chan          3-digit receiver channel number (e.g. 109)"
             echo "  --threads       Number of dspsr threads (default: 2)"
             exit 0
             ;;
@@ -59,7 +59,7 @@ if [[ ! -f "$PAR_PATH" ]]; then
     exit 1
 fi
 
-
+if [[ ! -d "$HOST_DIR" ]]; then
     echo "Error: Data directory '$HOST_DIR' does not exist."
     exit 1
 fi
