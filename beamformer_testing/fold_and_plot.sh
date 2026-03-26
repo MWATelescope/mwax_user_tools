@@ -1,10 +1,11 @@
 #!/bin/bash
 
-# Usage: ./fold_and_plot.sh --data-dir <dir> --output-dir <dir> --start-obsid <id> --end-obsid <id> --par <file> --beam <num> --chan <num> [--threads <num>]
-# Example: ./fold_and_plot.sh --data-dir /path/to/data --output-dir /path/to/output --start-obsid 1234567890 --end-obsid 1234567899 --par pulsar.par --beam 01 --chan 109 --threads 4
+# Usage: ./fold_and_plot.sh --data-dir <dir> --output-dir <dir> --start-obsid <id> --end-obsid <id> --par <file> --beam <num> --chan <num> [--threads <num>] [--bins <num>]
+# Example: ./fold_and_plot.sh --data-dir /path/to/data --output-dir /path/to/output --start-obsid 1234567890 --end-obsid 1234567899 --par pulsar.par --beam 01 --chan 109 --threads 4 --bins 256
 
 # --- Defaults ---
 THREADS=2
+BINS=128
 
 # --- Parse named arguments ---
 while [[ $# -gt 0 ]]; do
@@ -17,8 +18,9 @@ while [[ $# -gt 0 ]]; do
         --beam)        BEAM="$2";        shift 2 ;;
         --chan)         CHANNEL="ch$2";   shift 2 ;;
         --threads)     THREADS="$2";     shift 2 ;;
+        --bins)        BINS="$2";        shift 2 ;;
         --help)
-            echo "Usage: $0 --data-dir <dir> --output-dir <dir> --start-obsid <id> --end-obsid <id> --par <file> --beam <num> --chan <num> [--threads <num>]"
+            echo "Usage: $0 --data-dir <dir> --output-dir <dir> --start-obsid <id> --end-obsid <id> --par <file> --beam <num> --chan <num> [--threads <num>] [--bins <num>]"
             echo ""
             echo "  --data-dir      Directory containing VDIF, HDR and PAR files"
             echo "  --output-dir    Directory to write output .ar and .png files"
@@ -28,6 +30,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --beam          Zero-padded beam number (e.g. 01, 02)"
             echo "  --chan          3-digit receiver channel number (e.g. 109)"
             echo "  --threads       Number of dspsr threads (default: 2)"
+            echo "  --bins          Number of profile bins for dspsr (default: 128)"
             exit 0
             ;;
         *) echo "Unknown argument: $1"; exit 1 ;;
@@ -121,7 +124,7 @@ for HDR_PATH in "${HDR_FILES[@]}"; do
             -v "$OUTPUT_DIR":/output \
             -v "$PAR_DIR":/par \
             cirapulsarsandtransients/psr-analysis:latest \
-            -t "$THREADS" -A -L 10 -F 32:D -b 256 \
+            -t "$THREADS" -A -L 10 -F 32:D -b "$BINS" \
             -S 4 \
             -E /par/"$PAR_FILE" \
             -O /output/"${OBSID}_${CHANNEL}_beam${BEAM}" \
@@ -133,7 +136,7 @@ for HDR_PATH in "${HDR_FILES[@]}"; do
             -v "$OUTPUT_DIR":/output \
             -v "$PAR_DIR":/par \
             cirapulsarsandtransients/psr-analysis:latest \
-            -t "$THREADS" -A -L 10 -F 32:D -b 256 \
+            -t "$THREADS" -A -L 10 -F 32:D -b "$BINS" \
             -E /par/"$PAR_FILE" \
             -O /output/"${OBSID}_${CHANNEL}_beam${BEAM}" \
             /data/"$HDR_FILENAME"

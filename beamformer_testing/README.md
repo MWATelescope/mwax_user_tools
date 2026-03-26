@@ -29,6 +29,7 @@ For a given set of beamformer observations that prodced VDIF and associated HDR 
   --beam <num> \
   --chan <num> \
   [--threads <num>]
+  [--bins <num>]
 ```
 
 ## Arguments
@@ -43,6 +44,7 @@ For a given set of beamformer observations that prodced VDIF and associated HDR 
 | `--beam` | Yes | Zero-padded 2 digit beam number (e.g. `01`, `02`, etc) |
 | `--chan` | Yes | Zero-padded 3-digit receiver channel number (e.g. `091`, `123`, etc) |
 | `--threads` | No | Number of threads for `dspsr` (default: `2`) |
+| `--bins` | No | Number of profile bins for dspsr (default: 128) |
 
 ## Output
 
@@ -66,6 +68,7 @@ All output files are written to `--output-dir`:
   --beam 01 \
   --chan 091 \
   --threads 4
+  --bins 256
 ```
 
 ## Notes
