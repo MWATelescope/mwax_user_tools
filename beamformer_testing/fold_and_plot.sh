@@ -150,12 +150,12 @@ done
 
 # --- Combine .ar files (skip if only one HDR was processed) ---
 if [[ $NUM_HDR -gt 1 ]]; then
-    echo "Combining .ar files for beam $BEAM..."
+    echo "Combining .ar files for ch${CHANNEL} beam $BEAM..."
 
     docker run -it --rm --user "$(id -u):$(id -g)" --entrypoint psradd \
         -v "$OUTPUT_DIR":/output \
         cirapulsarsandtransients/psr-analysis:latest \
-        -o /output/beam"$BEAM"_"$PAR_BASE"_combined.ar "${AR_FILES[@]}"
+        -o /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined.ar "${AR_FILES[@]}"
 
     if [[ $? -ne 0 ]]; then
         echo "Error: psradd failed. Aborting."
@@ -166,28 +166,28 @@ else
     SINGLE_OBSID="$(basename "${HDR_FILES[0]}")"
     SINGLE_OBSID="${SINGLE_OBSID:0:10}"
     cp "$OUTPUT_DIR/${SINGLE_OBSID}_${CHANNEL}_beam${BEAM}.ar" \
-       "$OUTPUT_DIR/beam${BEAM}_${PAR_BASE}_combined.ar"
+       "$OUTPUT_DIR/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined.ar"
 fi
 
 # --- Generate plots ---
-echo "Generating profile plot for beam $BEAM..."
+echo "Generating profile plot for ch${CHANNEL} beam $BEAM..."
 
 docker run -it --rm --user "$(id -u):$(id -g)" --entrypoint pav \
     -v "$OUTPUT_DIR":/output \
     cirapulsarsandtransients/psr-analysis:latest \
-    -DFTp /output/beam"$BEAM"_"$PAR_BASE"_combined.ar -g /output/beam"$BEAM"_"$PAR_BASE"_profile.png/png
+    -DFTp /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined.ar -g /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_profile.png/png
 
 if [[ $? -ne 0 ]]; then
     echo "Error: pav failed."
     exit 1
 fi
 
-echo "Generating waterfall plot for beam $BEAM..."
+echo "Generating waterfall plot for beam ch${CHANNEL} $BEAM..."
 
 docker run -it --rm --user "$(id -u):$(id -g)" --entrypoint pav \
     -v "$OUTPUT_DIR":/output \
     cirapulsarsandtransients/psr-analysis:latest \
-    -GTp /output/beam"$BEAM"_"$PAR_BASE"_combined.ar -g /output/beam"$BEAM"_"$PAR_BASE"_waterfall.png/png
+    -GTp /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined.ar -g /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_waterfall.png/png
 
 if [[ $? -ne 0 ]]; then
     echo "Error: pav failed."
