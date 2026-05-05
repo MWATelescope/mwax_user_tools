@@ -150,7 +150,7 @@ done
 
 # --- Combine .ar files (skip if only one HDR was processed) ---
 if [[ $NUM_HDR -gt 1 ]]; then
-    echo "Combining .ar files for ch${CHANNEL} beam $BEAM..."
+    echo "Combining .ar files for ${CHANNEL} beam $BEAM..."
 
     docker run -it --rm --user "$(id -u):$(id -g)" --entrypoint psradd \
         -v "$OUTPUT_DIR":/output \
@@ -170,7 +170,7 @@ else
 fi
 
 # --- Generate plots ---
-echo "Generating profile plot for ch${CHANNEL} beam $BEAM..."
+echo "Generating profile plot for ${CHANNEL} beam $BEAM..."
 
 docker run -it --rm --user "$(id -u):$(id -g)" --entrypoint pav \
     -v "$OUTPUT_DIR":/output \
@@ -182,7 +182,7 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-echo "Generating waterfall plot for beam ch${CHANNEL} $BEAM..."
+echo "Generating waterfall plot for beam ${CHANNEL} $BEAM..."
 
 docker run -it --rm --user "$(id -u):$(id -g)" --entrypoint pav \
     -v "$OUTPUT_DIR":/output \
@@ -195,6 +195,6 @@ if [[ $? -ne 0 ]]; then
 fi
 
 echo "Done! Output files:"
-echo "  Combined archive : $OUTPUT_DIR/beam${BEAM}_${PAR_BASE}_combined.ar"
-echo "  Profile plot     : $OUTPUT_DIR/beam${BEAM}_${PAR_BASE}_profile.png"
-echo "  Waterfall plot   : $OUTPUT_DIR/beam${BEAM}_${PAR_BASE}_waterfall.png"
+echo "  Combined archive : $OUTPUT_DIR/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_combined.ar"
+echo "  Profile plot     : $OUTPUT_DIR/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_profile.png"
+echo "  Waterfall plot   : $OUTPUT_DIR/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_waterfall.png"
