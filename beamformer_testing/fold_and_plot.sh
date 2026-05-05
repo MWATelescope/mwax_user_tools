@@ -182,6 +182,18 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
+echo "Generating waterfall plot for beam $BEAM..."
+docker run -it --rm --user "$(id -u):$(id -g)" --entrypoint pav \
+    -v "$OUTPUT_DIR":/output \
+    cirapulsarsandtransients/psr-analysis:latest \
+    --GTp /output/beam"$BEAM"_"$PAR_BASE"_combined.ar -g /output/beam"$BEAM"_"$PAR_BASE"_waterfall.png/png
+
+if [[ $? -ne 0 ]]; then
+    echo "Error: pav failed."
+    exit 1
+fi
+
 echo "Done! Output files:"
 echo "  Combined archive : $OUTPUT_DIR/beam${BEAM}_${PAR_BASE}_combined.ar"
 echo "  Profile plot     : $OUTPUT_DIR/beam${BEAM}_${PAR_BASE}_profile.png"
+echo "  Waterfall plot   : $OUTPUT_DIR/beam${BEAM}_${PAR_BASE}_waterfall.png"
