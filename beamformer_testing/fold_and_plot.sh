@@ -119,7 +119,7 @@ for HDR_PATH in "${HDR_FILES[@]}"; do
     echo "Processing: $HDR_FILENAME (OBSID: $OBSID)"
 
     if [[ "$FIRST" == true ]]; then
-        docker run -it --rm --user "$(id -u):$(id -g)" --entrypoint dspsr \
+        docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint dspsr \
             -v "$HOST_DIR":/data \
             -v "$OUTPUT_DIR":/output \
             -v "$PAR_DIR":/par \
@@ -131,7 +131,7 @@ for HDR_PATH in "${HDR_FILES[@]}"; do
             /data/"$HDR_FILENAME"
         FIRST=false
     else
-        docker run -it --rm --user "$(id -u):$(id -g)" --entrypoint dspsr \
+        docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint dspsr \
             -v "$HOST_DIR":/data \
             -v "$OUTPUT_DIR":/output \
             -v "$PAR_DIR":/par \
@@ -152,7 +152,7 @@ done
 if [[ $NUM_HDR -gt 1 ]]; then
     echo "Combining .ar files for ${CHANNEL} beam $BEAM..."
 
-    docker run -it --rm --user "$(id -u):$(id -g)" --entrypoint psradd \
+    docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint psradd \
         -v "$OUTPUT_DIR":/output \
         cirapulsarsandtransients/psr-analysis:latest \
         -o /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined.ar "${AR_FILES[@]}"
@@ -172,7 +172,7 @@ fi
 # --- Generate plots ---
 echo "Generating profile plot for ${CHANNEL} beam $BEAM..."
 
-docker run -it --rm --user "$(id -u):$(id -g)" --entrypoint pav \
+docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint pav \
     -v "$OUTPUT_DIR":/output \
     cirapulsarsandtransients/psr-analysis:latest \
     -DFTp /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined.ar -g /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_profile.png/png
@@ -184,7 +184,7 @@ fi
 
 echo "Generating waterfall plot for beam ${CHANNEL} $BEAM..."
 
-docker run -it --rm --user "$(id -u):$(id -g)" --entrypoint pav \
+docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint pav \
     -v "$OUTPUT_DIR":/output \
     cirapulsarsandtransients/psr-analysis:latest \
     -GTp /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined.ar -g /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_waterfall.png/png
