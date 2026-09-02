@@ -123,11 +123,7 @@ for obsid in "${FOUND_OBSIDS[@]:-}"; do
     fi
 
     METAFITS="$DATA/${obsid}_metafits.fits"
-    if [[ -f "$METAFITS" ]]; then
-        echo "Metafits already exists for $obsid, skipping download and vdif_cat."
-        continue
-    fi
-
+    
     echo "Downloading metafits for obsid $obsid..."
     if ! curl -sSL --fail -o "$METAFITS" "${METADATA_URL}${obsid}"; then
         rm -f "$METAFITS"
