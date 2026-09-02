@@ -1,18 +1,45 @@
-# run.sh
+These tools allow you to take raw MWAX Beamformer output (in the form of 1 VDIF file per coarse channel per 8 seconds) and fold and plot the resulting pulsar.
+
+# Preparation
+
+To fold and plot, you need to first concatenate the vdif files and produce a HDR file. For this you need:
+* The metafits file for the observation
+* The mwax_mover "vdif_cat" tool
+
+# Steps
+
+## 1. Install mwax_mover vdif_cat tools
+1. Log into mwax25 as yourself.
+2. If `uv` is not installed, install it with `curl -LsSf https://astral.sh/uv/install.sh | sh` and follow the on screen instructions to enable it for your shell.
+3. Clone mwax_mover to your home directory: `git clone https://github.com/MWATelescope/mwax_mover.git $HOME/mwax_mover`.
+4. Build venv and download dependencies: `cd $HOME/mwax_mover; uv sync --upgrade`.
+
+## 2. Run the run.sh script from this repo (as yourself)
+
+Example:
+
+```bash
+$ cd $HOME/mwax_user_tools/beamformer_testing
+$ ./run.sh --data-dir /voltdata/test_data/golden_dst/1471263128/dst_dg0_cleaned0 --output-dir /voltdata/test_data/golden_dst/1471263128/dst_dg0_cleaned0 --par /voltdata/test_data/par/J1752-2806.par --start-obsid 1471263128 --end-obsid 1471263128 --beam 01 --start-chan 109 --end-chan 132
+```
+
+# Reference: Scripts
+
+## run.sh
 
 A wrapper around fold_and_plot.sh which allows running fold_and_plot across multiple obsids and channels.
 
-## run.sh: Overview
+### run.sh: Overview
 
 This is just a wrapper that called fold_and_plot.sh 1-N times. It folds and then produces plots.
 
-## run.sh: Usage
+### run.sh: Usage
 
 ```bash
 ./run.sh --data-dir DIR --output-dir DIR --par PSR --start-obsid ID --end-obsid ID --beam BEAM --start-chan N --end-chan N [--bins N] [--threads N]
 ```
 
-## run.sh: Arguments
+### run.sh: Arguments
 
 | Argument | Required | Description |
 |---|---|---|
@@ -27,12 +54,12 @@ This is just a wrapper that called fold_and_plot.sh 1-N times. It folds and then
 | `--threads` | No | Number of threads for `dspsr` (default: `4`) |
 | `--bins` | No | Number of profile bins for dspsr (default: 64) |
 
-# fold_and_plot.sh
+## fold_and_plot.sh
 
 A bash script to automate pulsar folding and plotting from VDIF observation data using the `cirapulsarsandtransients/psr-analysis` Docker image.
 **NOTE** This script is run multiple times by the "run.sh" script, so normally you don't need to worry about it.
 
-## fold_and_plot.sh: Overview
+### fold_and_plot.sh: Overview
 
 For a given set of beamformer observations that produced VDIF and associated HDR files, the script will:
 
@@ -40,20 +67,20 @@ For a given set of beamformer observations that produced VDIF and associated HDR
 2. Combine the resulting `.ar` files using `psradd` (skipped if only one HDR file is found)
 3. Generate an integrated pulse profile plot using `pav`
 
-## fold_and_plot.sh: Requirements
+### fold_and_plot.sh: Requirements
 
 - Docker
 - Input directory containing `.vdif`, `.hdr`
 - `.par` file to use for ephemeris. Get this by copying and pasting the "short" ephemeris from the [ATNF Pulsar Catalog](https://www.atnf.csiro.au/research/pulsar/psrcat/)
 - The `cirapulsarsandtransients/psr-analysis` Docker image
 
-## fold_and_plot.sh: Usage
+### fold_and_plot.sh: Usage
 
 ```bash
 ./fold_and_plot.sh --data-dir <dir> --output-dir <dir> --start-obsid <id> --end-obsid <id> --par <file> --beam <num> --chan <num> [--threads <num>] [--bins <num>]
 ```
 
-## fold_and_plot.sh: Arguments
+### fold_and_plot.sh: Arguments
 
 | Argument | Required | Description |
 |---|---|---|
@@ -67,7 +94,7 @@ For a given set of beamformer observations that produced VDIF and associated HDR
 | `--threads` | No | Number of threads for `dspsr` (default: `4`) |
 | `--bins` | No | Number of profile bins for dspsr (default: 64) |
 
-## fold_and_plot.sh: Output
+### fold_and_plot.sh: Output
 
 All output files are written to `--output-dir`:
 
@@ -78,10 +105,9 @@ All output files are written to `--output-dir`:
 | `<par>_<channel>_beam<beam>_combined_profile.png` | Integrated pulse profile plot |
 | `<par>_<channel>_beam<beam>_combined_waterfall.png` | Waterfall plot |
 
-## fold_and_plot.sh: Notes
+### fold_and_plot.sh: Notes
 
 - Only HDR files matching the specified channel, beam, and obsid range are processed
 - The first HDR file is processed with an additional `-S 4` flag to `dspsr` to skip the first 4 seconds to account for QUACKTIME
 - Output files are owned by the user running the script (not root)
 - Run `./fold_and_plot.sh --help` for a quick usage summary
-

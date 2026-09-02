@@ -89,6 +89,57 @@ is_int "$THREADS" || fail "--threads '$THREADS' must be a positive integer"
 
 [[ -x ./fold_and_plot.sh ]] || fail "./fold_and_plot.sh not found or not executable in the current directory"
 
+# ---- vdif_cat setup / validation ----
+VDIF_CAT_DIR="$HOME/mwax_mover"
+VDIF_CAT_PY="$VDIF_CAT_DIR/.venv/bin/python3"
+VDIF_CAT_SCRIPT="$VDIF_CAT_DIR/vdif_cat.py"
+
+[[ -x "$VDIF_CAT_PY" ]] || fail "venv python not found or not executable: $VDIF_CAT_PY"
+[[ -f "$VDIF_CAT_SCRIPT" ]] || fail "vdif_cat script not found: $VDIF_CAT_SCRIPT"
+
+# ---- Download the metafits files and run vdif_cat ----
+METADATA_URL="http://ws.mwatelescope.org/metadata/fits?obs_id="
+
+echo "Scanning $DATA for .vdif obsids between $OBSID_START and $OBSID_END..."
+
+# Extract the first 10 digits of every .vdif filename in DATA, keep unique numeric values
+FOUND_OBSIDS=()
+while IFS= read -r obsid; do
+    FOUND_OBSIDS+=("$obsid")
+done < <(
+    find "$DATA" -maxdepth 1 -type f -name '*.vdif' -printf '%f\n' \
+        | grep -oE '^[0-9]{10}' \
+        | sort -un
+)
+
+if (( ${#FOUND_OBSIDS[@]} == 0 )); then
+    fail "No .vdif filenames starting with a 10-digit obsid were found in $DATA"
+fi
+
+for obsid in "${FOUND_OBSIDS[@]:-}"; do
+    [[ -z "$obsid" ]] && continue
+    if (( obsid < OBSID_START || obsid > OBSID_END )); then
+        continue
+    fi
+
+    METAFITS="$DATA/${obsid}_metafits.fits"
+    if [[ -f "$METAFITS" ]]; then
+        echo "Metafits already exists for $obsid, skipping download and vdif_cat."
+        continue
+    fi
+
+    echo "Downloading metafits for obsid $obsid..."
+    if ! curl -sSL --fail -o "$METAFITS" "${METADATA_URL}${obsid}"; then
+        rm -f "$METAFITS"
+        fail "Failed to download metafits for obsid $obsid from ${METADATA_URL}${obsid}"
+    fi
+
+    echo "Running vdif_cat for obsid $obsid..."
+    if ! "$VDIF_CAT_PY" "$VDIF_CAT_SCRIPT" -m "$METAFITS" -i "$DATA" -o "$DATA"; then
+        fail "vdif_cat failed for obsid $obsid"
+    fi
+done
+
 # ---- Main ----
 for chan in $(seq "$CHAN_START" "$CHAN_END"); do
     ./fold_and_plot.sh \
