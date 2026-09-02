@@ -70,8 +70,7 @@ fail() {
 # ---- Type / value validation ----
 [[ -d "$DATA" ]] || fail "--data-dir '$DATA' does not exist or is not a directory"
 [[ -d "$OUTPUT" ]] || fail "--output-dir '$OUTPUT' does not exist or is not a directory"
-
-[[ "$PSR" =~ ^J[0-9]{4}[+-][0-9]{2,4}$ ]] || fail "--par '$PSR' doesn't look like a valid pulsar name (expected format e.g. J1752-2806)"
+[[ -f "$PSR" ]] || fail "--par '$PSR' does not exist or is not a file"
 
 is_int "$OBSID_START" || fail "--start-obsid '$OBSID_START' must be an integer"
 is_int "$OBSID_END"   || fail "--end-obsid '$OBSID_END' must be an integer"
