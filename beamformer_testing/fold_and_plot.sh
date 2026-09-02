@@ -144,15 +144,19 @@ for HDR_PATH in "${HDR_FILES[@]}"; do
         exit 1
     fi
 
-    # --- Zap the first integration ---  
-    echo "Zapping first integration for ${OBSID} channel ${CHANNEL} beam $BEAM..."  
+    # --- Zap the first 2 integrations ---  
+    echo "Zapping first two integrations for ${OBSID} channel ${CHANNEL} beam $BEAM..."  
     docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint paz \
             -v "$HOST_DIR":/data \
             -v "$OUTPUT_DIR":/output \
             -v "$PAR_DIR":/par \
             cirapulsarsandtransients/psr-analysis:latest \
-            -w "0" -m /output/${OBSID}_${CHANNEL}_beam${BEAM}.ar                      
-            
+            -w "0 1" -m /output/${OBSID}_${CHANNEL}_beam${BEAM}.ar                      
+    
+    if [[ $? -ne 0 ]]; then
+        echo "Error: paz failed. Aborting."
+        exit 1
+    fi
 done
 
 # --- Combine .ar files (skip if only one HDR was processed) ---
@@ -216,13 +220,13 @@ fi
 # --- Dumping stats
 echo "Dumping stats for ${CHANNEL} beam $BEAM..."
 
-docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint psrstat \
+docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint pdv \
     -v "$OUTPUT_DIR":/output \
     cirapulsarsandtransients/psr-analysis:latest \
-    -j F -c snr /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined.ar
+    -f -F /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined.ar
 
 if [[ $? -ne 0 ]]; then
-    echo "Error: psrstat failed."
+    echo "Error: pdv failed."
     exit 1
 fi
 
