@@ -122,7 +122,7 @@ for HDR_PATH in "${HDR_FILES[@]}"; do
             -v "$OUTPUT_DIR":/output \
             -v "$PAR_DIR":/par \
             cirapulsarsandtransients/psr-analysis:latest \
-            -t "$THREADS" -A -L 10 -F 32:D -b "$BINS" \
+            -t "$THREADS" -A -L 4 -F 32:D -b "$BINS" \
             -S 4 \
             -E /par/"$PAR_FILE" \
             -O /output/"${OBSID}_${CHANNEL}_beam${BEAM}" \
@@ -134,7 +134,7 @@ for HDR_PATH in "${HDR_FILES[@]}"; do
             -v "$OUTPUT_DIR":/output \
             -v "$PAR_DIR":/par \
             cirapulsarsandtransients/psr-analysis:latest \
-            -t "$THREADS" -A -L 10 -F 32:D -b "$BINS" \
+            -t "$THREADS" -A -L 4 -F 32:D -b "$BINS" \
             -E /par/"$PAR_FILE" \
             -O /output/"${OBSID}_${CHANNEL}_beam${BEAM}" \
             /data/"$HDR_FILENAME"
@@ -144,6 +144,15 @@ for HDR_PATH in "${HDR_FILES[@]}"; do
         echo "Error: dspsr failed for $HDR_FILENAME. Aborting."
         exit 1
     fi
+
+    # --- Zap the first integration ---  
+    echo "Zapping first integration for ${OBSID} channel ${CHANNEL} beam $BEAM..."  
+    docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint dspsr \
+            -v "$HOST_DIR":/data \
+            -v "$OUTPUT_DIR":/output \
+            -v "$PAR_DIR":/par \
+            cirapulsarsandtransients/psr-analysis:latest \
+            -w "0" -m /output/${OBSID}_${CHANNEL}_beam${BEAM}_combined.ar
 done
 
 # --- Combine .ar files (skip if only one HDR was processed) ---
