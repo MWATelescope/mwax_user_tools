@@ -92,7 +92,7 @@ is_int "$THREADS" || fail "--threads '$THREADS' must be a positive integer"
 # ---- vdif_cat setup / validation ----
 VDIF_CAT_DIR="$HOME/mwax_mover"
 VDIF_CAT_PY="$VDIF_CAT_DIR/.venv/bin/python3"
-VDIF_CAT_SCRIPT="$VDIF_CAT_DIR/vdif_cat.py"
+VDIF_CAT_SCRIPT="$VDIF_CAT_DIR/src/mwax_mover/cli/vdif_cat.py"
 
 [[ -x "$VDIF_CAT_PY" ]] || fail "venv python not found or not executable: $VDIF_CAT_PY"
 [[ -f "$VDIF_CAT_SCRIPT" ]] || fail "vdif_cat script not found: $VDIF_CAT_SCRIPT"
