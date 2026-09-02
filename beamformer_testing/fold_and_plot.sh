@@ -147,12 +147,12 @@ for HDR_PATH in "${HDR_FILES[@]}"; do
 
     # --- Zap the first integration ---  
     echo "Zapping first integration for ${OBSID} channel ${CHANNEL} beam $BEAM..."  
-    docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint dspsr \
+    docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint paz \
             -v "$HOST_DIR":/data \
             -v "$OUTPUT_DIR":/output \
             -v "$PAR_DIR":/par \
             cirapulsarsandtransients/psr-analysis:latest \
-            -w "0" -m /output/${OBSID}_${CHANNEL}_beam${BEAM}.ar
+            -w "0" -m /output/${OBSID}_${CHANNEL}_beam${BEAM}.ar                      
             
 done
 
