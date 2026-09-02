@@ -87,9 +87,6 @@ is_int "$THREADS" || fail "--threads '$THREADS' must be a positive integer"
 (( BINS > 0 ))    || fail "--bins must be greater than 0"
 (( THREADS > 0 )) || fail "--threads must be greater than 0"
 
-PARFILE="/voltdata/test_data/par/$PSR.par"
-[[ -f "$PARFILE" ]] || fail "par file not found: $PARFILE"
-
 [[ -x ./fold_and_plot.sh ]] || fail "./fold_and_plot.sh not found or not executable in the current directory"
 
 # ---- Main ----
@@ -99,7 +96,7 @@ for chan in $(seq "$CHAN_START" "$CHAN_END"); do
         --output-dir "$OUTPUT" \
         --start-obsid "$OBSID_START" \
         --end-obsid "$OBSID_END" \
-        --par "$PARFILE" \
+        --par "$PSR" \
         --beam "$BEAM" \
         --chan "$chan" \
         --threads "$THREADS" \
