@@ -203,6 +203,19 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
+# --- Dumping stats
+echo "Dumping stats for ${CHANNEL} beam $BEAM..."
+
+docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint psrstat \
+    -v "$OUTPUT_DIR":/output \
+    cirapulsarsandtransients/psr-analysis:latest \
+    -j FT -c snr /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined.ar
+
+if [[ $? -ne 0 ]]; then
+    echo "Error: psrstat failed."
+    exit 1
+fi
+
 echo "Done! Output files:"
 echo "  Combined archive : $OUTPUT_DIR/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_combined.ar"
 echo "  Profile plot     : $OUTPUT_DIR/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_profile.png"
