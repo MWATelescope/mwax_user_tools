@@ -191,7 +191,20 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
+echo "Generating subint plot for beam ${CHANNEL} $BEAM..."
+
+docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint pav \
+    -v "$OUTPUT_DIR":/output \
+    cirapulsarsandtransients/psr-analysis:latest \
+    -Y /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined.ar -g /output/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_subint.png/png
+
+if [[ $? -ne 0 ]]; then
+    echo "Error: pav failed."
+    exit 1
+fi
+
 echo "Done! Output files:"
 echo "  Combined archive : $OUTPUT_DIR/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_combined.ar"
 echo "  Profile plot     : $OUTPUT_DIR/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_profile.png"
 echo "  Waterfall plot   : $OUTPUT_DIR/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_waterfall.png"
+echo "  Subint plot      : $OUTPUT_DIR/${PAR_BASE}_${CHANNEL}_beam${BEAM}_combined_subint.png"
