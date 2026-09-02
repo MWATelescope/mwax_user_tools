@@ -129,7 +129,7 @@ for obsid in "${FOUND_OBSIDS[@]:-}"; do
 
     # Cleanup old concatenated files for this obsid
     echo "Cleaning up old concatenated files for obsid $obsid..."
-    rm -fv $INPUT/${obsid}_ch*_beam*.vdif
+    rm -fv ${DATA}/${obsid}_ch*_beam*.vdif
 
     METAFITS="$DATA/${obsid}_metafits.fits"
     
