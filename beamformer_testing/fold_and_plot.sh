@@ -105,8 +105,7 @@ fi
 echo "Found $NUM_HDR HDR file(s) to process."
 
 # --- Process each HDR file ---
-# Purposly ignoring the logic to make the first run different from the rest.
-FIRST=false
+FIRST=true
 AR_FILES=()
 
 for HDR_PATH in "${HDR_FILES[@]}"; do
