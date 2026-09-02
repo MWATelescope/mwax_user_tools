@@ -144,6 +144,19 @@ for HDR_PATH in "${HDR_FILES[@]}"; do
         exit 1
     fi
 
+    # --- Dumping stats
+    echo "Dumping stats for ${CHANNEL} beam $BEAM... BEFORE zapping"
+
+    docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint pdv \
+        -v "$OUTPUT_DIR":/output \
+        cirapulsarsandtransients/psr-analysis:latest \
+        -f -F /output/${OBSID}_${CHANNEL}_beam${BEAM}.ar
+
+    if [[ $? -ne 0 ]]; then
+        echo "Error: pdv failed."
+        exit 1
+    fi
+
     # --- Zap the first 2 integrations ---  
     echo "Zapping first two integrations for ${OBSID} channel ${CHANNEL} beam $BEAM..."  
     docker run -it --rm --user "$(id -u):$(getent group mwa | cut -d: -f3)" --entrypoint paz \
