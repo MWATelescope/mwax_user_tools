@@ -1,11 +1,8 @@
 #!/bin/bash
 
-# Usage: ./fold_and_plot.sh --data-dir <dir> --output-dir <dir> --start-obsid <id> --end-obsid <id> --par <file> --beam <num> --chan <num> [--threads <num>] [--bins <num>]
-# Example: ./fold_and_plot.sh --data-dir /path/to/data --output-dir /path/to/output --start-obsid 1234567890 --end-obsid 1234567899 --par pulsar.par --beam 01 --chan 109 --threads 4 --bins 256
-
 # --- Defaults ---
-THREADS=2
-BINS=128
+THREADS=4
+BINS=64
 
 # --- Parse named arguments ---
 while [[ $# -gt 0 ]]; do
@@ -26,11 +23,11 @@ while [[ $# -gt 0 ]]; do
             echo "  --output-dir    Directory to write output .ar and .png files"
             echo "  --start-obsid   10-digit start observation ID (inclusive)"
             echo "  --end-obsid     10-digit end observation ID (inclusive)"
-            echo "  --par           PAR filename (no path)"
+            echo "  --par           PAR filename (full local path and filename)"
             echo "  --beam          Zero-padded beam number (e.g. 01, 02)"
             echo "  --chan          3-digit receiver channel number (e.g. 109)"
-            echo "  --threads       Number of dspsr threads (default: 2)"
-            echo "  --bins          Number of profile bins for dspsr (default: 128)"
+            echo "  --threads       Number of dspsr threads (default: $THREADS)"
+            echo "  --bins          Number of profile bins for dspsr (default: $BINS)"
             exit 0
             ;;
         *) echo "Unknown argument: $1"; exit 1 ;;
