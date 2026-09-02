@@ -152,7 +152,8 @@ for HDR_PATH in "${HDR_FILES[@]}"; do
             -v "$OUTPUT_DIR":/output \
             -v "$PAR_DIR":/par \
             cirapulsarsandtransients/psr-analysis:latest \
-            -w "0" -m /output/${OBSID}_${CHANNEL}_beam${BEAM}_combined.ar
+            -w "0" -m /output/${OBSID}_${CHANNEL}_beam${BEAM}.ar
+            
 done
 
 # --- Combine .ar files (skip if only one HDR was processed) ---
