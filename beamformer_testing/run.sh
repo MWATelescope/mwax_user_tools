@@ -89,6 +89,11 @@ is_int "$THREADS" || fail "--threads '$THREADS' must be a positive integer"
 
 [[ -x ./fold_and_plot.sh ]] || fail "./fold_and_plot.sh not found or not executable in the current directory"
 
+# ---- cleanup ----
+rm -v $OUTPUT/*.ar
+rm -v $OUTPUT/*.png
+rm -v $OUTPUT/*.hdr
+
 # ---- vdif_cat setup / validation ----
 VDIF_CAT_DIR="$HOME/mwax_mover"
 VDIF_CAT_PY="$VDIF_CAT_DIR/.venv/bin/python3"
@@ -121,6 +126,10 @@ for obsid in "${FOUND_OBSIDS[@]:-}"; do
     if (( obsid < OBSID_START || obsid > OBSID_END )); then
         continue
     fi
+
+    # Cleanup old concatenated files for this obsid
+    echo "Cleaning up old concatenated files for obsid $obsid..."
+    rm -v $OUTPUT/${obsid}_ch*_beam*.vdif
 
     METAFITS="$DATA/${obsid}_metafits.fits"
     
