@@ -90,7 +90,6 @@ is_int "$THREADS" || fail "--threads '$THREADS' must be a positive integer"
 [[ -x ./fold_and_plot.sh ]] || fail "./fold_and_plot.sh not found or not executable in the current directory"
 
 # ---- cleanup ----
-rm -fv $DATA/*.hdr
 rm -fv $OUTPUT/*.ar
 rm -fv $OUTPUT/*.png
 
@@ -121,29 +120,33 @@ if (( ${#FOUND_OBSIDS[@]} == 0 )); then
     fail "No .vdif filenames starting with a 10-digit obsid were found in $DATA"
 fi
 
-for obsid in "${FOUND_OBSIDS[@]:-}"; do
-    [[ -z "$obsid" ]] && continue
-    if (( obsid < OBSID_START || obsid > OBSID_END )); then
-        continue
-    fi
-
-    # Cleanup old concatenated files for this obsid
-    echo "Cleaning up old concatenated files for obsid $obsid..."
-    rm -fv ${DATA}/${obsid}_ch*_beam*.vdif
-
-    METAFITS="$DATA/${obsid}_metafits.fits"
-    
-    echo "Downloading metafits for obsid $obsid..."
-    if ! curl -sSL --fail -o "$METAFITS" "${METADATA_URL}${obsid}"; then
-        rm -f "$METAFITS"
-        fail "Failed to download metafits for obsid $obsid from ${METADATA_URL}${obsid}"
-    fi
-
-    echo "Running vdif_cat for obsid $obsid..."
-    if ! "$VDIF_CAT_PY" "$VDIF_CAT_SCRIPT" -m "$METAFITS" -i "$DATA" -o "$DATA"; then
-        fail "vdif_cat failed for obsid $obsid"
-    fi
-done
+#
+# TODO: The below code only needs to run if we have un-concatenated VDIF output from the beamformer
+# We should really check it and skip this step if we already have concatenated VDIF files.
+#
+#for obsid in "${FOUND_OBSIDS[@]:-}"; do
+#    [[ -z "$obsid" ]] && continue
+#    if (( obsid < OBSID_START || obsid > OBSID_END )); then
+#        continue
+#    fi
+#
+#    # Cleanup old concatenated files for this obsid
+#    echo "Cleaning up old concatenated files for obsid $obsid..."
+#    rm -fv ${DATA}/${obsid}_ch*_beam*.vdif
+#
+#    METAFITS="$DATA/${obsid}_metafits.fits"
+#    
+#    echo "Downloading metafits for obsid $obsid..."
+#    if ! curl -sSL --fail -o "$METAFITS" "${METADATA_URL}${obsid}"; then
+#        rm -f "$METAFITS"
+#        fail "Failed to download metafits for obsid $obsid from ${METADATA_URL}${obsid}"
+#    fi
+#
+#    echo "Running vdif_cat for obsid $obsid..."
+#    if ! "$VDIF_CAT_PY" "$VDIF_CAT_SCRIPT" -m "$METAFITS" -i "$DATA" -o "$DATA"; then
+#        fail "vdif_cat failed for obsid $obsid"
+#    fi
+#done
 
 # ---- Main ----
 for chan in $(seq "$CHAN_START" "$CHAN_END"); do
