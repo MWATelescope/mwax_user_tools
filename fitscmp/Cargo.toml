@@ -1,0 +1,10 @@
+[package]
+name = "fitscmp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+fitsio = { version = "0.21.7", features = ["array"] }
+ndarray = "0.16.1"
+num = "0.4.3"
